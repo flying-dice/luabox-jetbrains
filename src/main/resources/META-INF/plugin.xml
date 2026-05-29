@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>dev.pseudoscript.intellij</id>
+    <id>dev.pseudoscript.pds</id>
     <name>PseudoScript</name>
     <vendor email="hello@pseudoscript.dev" url="https://pseudoscript.dev">PseudoScript</vendor>
 

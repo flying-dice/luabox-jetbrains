@@ -66,7 +66,14 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            recommended()
+            // Verify against the exact build target rather than `recommended()`,
+            // which resolves to IDE versions not always published yet (it picked
+            // an unavailable ideaIC:2025.3 on CI). Add more versions in the
+            // since/until range here as they become available.
+            ide(
+                IntelliJPlatformType.fromCode(providers.gradleProperty("platformType").get()),
+                providers.gradleProperty("platformVersion").get(),
+            )
         }
     }
 }
