@@ -17,6 +17,10 @@ jobs:
   release:
     name: Release on version bump
     runs-on: ubuntu-latest
+    env:
+      # Marketplace publish token (read by `publishPlugin`); empty when the
+      # secret isn't set, which skips the publish step.
+      JB_TOKEN: ${{ secrets.JB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,3 +63,11 @@ jobs:
           generate_release_notes: true
           files: build/distributions/*.zip
           fail_on_unmatched_files: true
+
+      # Uploads to the JetBrains Marketplace. The plugin listing must already
+      # exist there (the first version is uploaded manually); this fails loudly
+      # until then. Runs last so a Marketplace error doesn't block the GitHub
+      # Release. Skipped automatically when JB_TOKEN isn't configured.
+      - name: Publish to JetBrains Marketplace
+        if: steps.meta.outputs.exists == 'false' && env.JB_TOKEN != ''
+        run: ./gradlew publishPlugin

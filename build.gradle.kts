@@ -76,4 +76,13 @@ intellijPlatform {
             )
         }
     }
+
+    // `./gradlew publishPlugin` uploads to the JetBrains Marketplace using a
+    // permanent token (Marketplace → My Tokens), supplied via the JB_TOKEN env
+    // var in CI. The very first version must be uploaded manually through the
+    // Marketplace web form to create the listing; updates can then be automated.
+    // (Signing is optional — add an `signing { }` block here when desired.)
+    publishing {
+        token = providers.environmentVariable("JB_TOKEN")
+    }
 }
