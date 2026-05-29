@@ -1,0 +1,133 @@
+<idea-plugin>
+    <id>dev.pseudoscript.intellij</id>
+    <name>PseudoScript</name>
+    <vendor email="hello@pseudoscript.dev" url="https://pseudoscript.dev">PseudoScript</vendor>
+
+    <description><![CDATA[
+        <p>Language support for <b>PseudoScript</b> (<code>.pds</code>) — an
+        architecture-modeling language that reads like pseudocode, expresses
+        C4-style structure (system / container / component / person), and
+        compiles to SVG diagrams.</p>
+
+        <h3>Features</h3>
+        <ul>
+            <li><b>Syntax highlighting</b>, comment toggling, and a color-scheme
+                page (bundled, no server needed).</li>
+            <li><b>Diagnostics, hover, formatting, and go-to-definition</b> via
+                the <code>pds lsp</code> language server.</li>
+            <li><b>Build / Serve Docs</b> — right-click a <code>pds.toml</code>
+                to generate the documentation site (<code>pds doc</code>) or
+                serve it locally (<code>pds doc --serve</code>).</li>
+        </ul>
+
+        <h3>Requirements</h3>
+        <ul>
+            <li>The <a href="https://plugins.jetbrains.com/plugin/23257-lsp4ij">LSP4IJ</a>
+                plugin (installed automatically as a dependency).</li>
+            <li>The <code>pds</code> binary on your <code>PATH</code>, or its
+                location set in
+                <i>Settings &gt; Languages &amp; Frameworks &gt; PseudoScript</i>.</li>
+        </ul>
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <ul>
+            <li><b>0.1.0</b> — Initial release: syntax highlighting, LSP-backed
+                diagnostics / hover / formatting / go-to-definition, and a
+                Build / Serve Docs context menu on <code>pds.toml</code>.</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- Platform + the LSP4IJ client runtime. -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+            name="PseudoScript"
+            implementationClass="dev.pseudoscript.lang.PseudoScriptFileType"
+            fieldName="INSTANCE"
+            language="PseudoScript"
+            extensions="pds"/>
+
+        <lang.syntaxHighlighterFactory
+            language="PseudoScript"
+            implementationClass="dev.pseudoscript.highlight.PseudoScriptSyntaxHighlighterFactory"/>
+
+        <!--
+          Give .pds files LSP4IJ's semantic-token-based PSI: one element per
+          token with a navigation reference. This scopes Cmd-hover/Cmd-click to
+          the symbol under the caret (instead of the whole file) and keeps the
+          semantic-token colouring on LSP4IJ's intended path. Requires LSP4IJ ≥
+          the version that ships this view provider.
+        -->
+        <lang.fileViewProviderFactory
+            language="PseudoScript"
+            implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
+
+        <lang.commenter
+            language="PseudoScript"
+            implementationClass="dev.pseudoscript.lang.PseudoScriptCommenter"/>
+
+        <lang.braceMatcher
+            language="PseudoScript"
+            implementationClass="dev.pseudoscript.lang.PseudoScriptBraceMatcher"/>
+
+        <colorSettingsPage
+            implementation="dev.pseudoscript.highlight.PseudoScriptColorSettingsPage"/>
+
+        <applicationService
+            serviceImplementation="dev.pseudoscript.settings.PseudoScriptSettings"/>
+
+        <applicationConfigurable
+            parentId="language"
+            instance="dev.pseudoscript.settings.PseudoScriptConfigurable"
+            id="dev.pseudoscript.settings.PseudoScriptConfigurable"
+            displayName="PseudoScript"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
+        <server
+            id="pseudoscript"
+            name="PseudoScript Language Server"
+            factoryClass="dev.pseudoscript.lsp.PseudoScriptLanguageServerFactory">
+            <description><![CDATA[
+                The <code>pds lsp</code> stdio language server.
+            ]]></description>
+        </server>
+
+        <languageMapping
+            language="PseudoScript"
+            serverId="pseudoscript"
+            languageId="pseudoscript"/>
+
+        <!-- Route `pds lsp` semantic tokens to the plugin's PseudoScript colours. -->
+        <semanticTokensColorsProvider
+            serverId="pseudoscript"
+            class="dev.pseudoscript.lsp.PseudoScriptSemanticTokensColorsProvider"/>
+    </extensions>
+
+    <actions>
+        <group
+            id="dev.pseudoscript.PdsTomlActions"
+            class="dev.pseudoscript.actions.PdsTomlActionGroup"
+            text="PseudoScript"
+            popup="true">
+            <action
+                id="dev.pseudoscript.BuildDocs"
+                class="dev.pseudoscript.actions.BuildDocsAction"
+                text="Build Docs"
+                description="Generate the documentation site (pds doc)."
+                icon="AllIcons.Actions.Compile"/>
+            <action
+                id="dev.pseudoscript.ServeDocs"
+                class="dev.pseudoscript.actions.ServeDocsAction"
+                text="Serve Docs"
+                description="Generate and serve the documentation site (pds doc --serve)."
+                icon="AllIcons.Actions.Execute"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>
