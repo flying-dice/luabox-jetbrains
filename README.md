@@ -1,8 +1,14 @@
 # PseudoScript for JetBrains IDEs
 
+[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/32021?label=Marketplace&logo=jetbrains&color=000000)](https://plugins.jetbrains.com/plugin/32021-pseudoscript)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/32021?label=Downloads)](https://plugins.jetbrains.com/plugin/32021-pseudoscript)
+[![Build](https://github.com/flying-dice/pseudoscript-jetbrains/actions/workflows/build.yml/badge.svg)](https://github.com/flying-dice/pseudoscript-jetbrains/actions/workflows/build.yml)
+
 The IntelliJ-platform plugin for **PseudoScript** (`.pds`) — syntax & semantic
 highlighting, diagnostics, navigation, hover, formatting, and a docs-generation
 menu, all in your JetBrains IDE.
+
+**[Install from the JetBrains Marketplace →](https://plugins.jetbrains.com/plugin/32021-pseudoscript)**
 
 > **Looking for the language itself?** PseudoScript — the language, its
 > specification, and the `pds` compiler / LSP / docs toolchain — lives in the
@@ -52,14 +58,17 @@ navigation when it's running).
 
 ## Install
 
-**From the JetBrains Marketplace** (recommended): **Settings → Plugins →
-Marketplace**, search **PseudoScript**, click **Install**, and restart when
-prompted. LSP4IJ is pulled in automatically as a dependency.
+**From the JetBrains Marketplace** (recommended) — the
+[**PseudoScript** listing](https://plugins.jetbrains.com/plugin/32021-pseudoscript):
+in your IDE, **Settings → Plugins → Marketplace**, search **PseudoScript**, click
+**Install**, and restart when prompted. LSP4IJ is pulled in automatically as a
+dependency.
 
 <details>
 <summary>Install from a zip (pre-release or local builds)</summary>
 
-1. Build it: `./gradlew buildPlugin` → `build/distributions/PseudoScript-<version>.zip`.
+1. Build it: `./gradlew buildPlugin` → `build/distributions/pseudoscript-jetbrains-<version>.zip`
+   (or grab a zip from the [Releases](https://github.com/flying-dice/pseudoscript-jetbrains/releases)).
 2. In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → pick the zip.
    Install LSP4IJ from the Marketplace first (it isn't bundled in the zip).
 3. Restart when prompted. Reinstalling the same version? Uninstall the old copy
@@ -98,7 +107,7 @@ This section is for working on the plugin itself.
 
 ```sh
 ./gradlew runIde          # launch a sandbox IDE with the plugin loaded
-./gradlew buildPlugin     # produce build/distributions/PseudoScript-<version>.zip
+./gradlew buildPlugin     # produce build/distributions/pseudoscript-jetbrains-<version>.zip
 ./gradlew verifyPlugin    # run the JetBrains Plugin Verifier
 ./gradlew test            # run the lexer acceptance suite (no IDE needed)
 ```
