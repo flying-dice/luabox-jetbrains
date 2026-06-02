@@ -136,7 +136,8 @@ class DiagramPanel(
      */
     private fun export() {
         val svg = currentSvg ?: return
-        val descriptor = FileSaverDescriptor("Export Diagram", "Save the diagram as SVG or PNG", "svg", "png")
+        val descriptor = FileSaverDescriptor("Export Diagram", "Save the diagram as SVG or PNG")
+            .apply { withExtensionFilter("Diagram (SVG, PNG)", "svg", "png") }
         val dialog = FileChooserFactory.getInstance().createSaveFileDialog(descriptor, this)
         val wrapper = dialog.save(null as VirtualFile?, suggestedFileName()) ?: return
         val out = wrapper.file

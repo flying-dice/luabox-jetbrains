@@ -22,7 +22,7 @@ class PseudoScriptConfigurable : Configurable {
             text = settings.pdsPath
             addBrowseFolderListener(
                 null,
-                FileChooserDescriptorFactory.createSingleFileDescriptor()
+                FileChooserDescriptorFactory.singleFile()
                     .withTitle("Select the pds Binary"),
             )
         }

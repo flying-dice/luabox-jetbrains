@@ -46,7 +46,7 @@ navigation when it's running).
 
 ## Requirements
 
-- A JetBrains IDE **2024.3 – 2026.1** (any flavor: IDEA Community/Ultimate,
+- A JetBrains IDE **2025.1 – 2026.1** (any flavor: IDEA Community/Ultimate,
   RustRover, WebStorm, …).
 - The [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij) plugin,
   **0.19.4 or newer** — a hard dependency installed automatically from the
@@ -118,7 +118,7 @@ This section is for working on the plugin itself.
 ./gradlew test            # run the lexer acceptance suite (no IDE needed)
 ```
 
-The build needs **JDK 21** (the 2024.3+ platform requirement); Gradle resolves
+The build needs **JDK 21** (the 2025.1+ platform requirement); Gradle resolves
 it via the configured toolchain. Run configurations for the common tasks are
 checked in under `.run/`.
 

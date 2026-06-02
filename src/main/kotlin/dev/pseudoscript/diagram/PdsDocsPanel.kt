@@ -3,7 +3,7 @@ package dev.pseudoscript.diagram
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.OSProcessHandler
-import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessListener
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
@@ -151,7 +151,7 @@ class PdsDocsPanel(private val project: Project) : JPanel(BorderLayout()), Dispo
         }
         handler = process
         showStatus("Building & serving docs…")
-        process.addProcessListener(object : ProcessAdapter() {
+        process.addProcessListener(object : ProcessListener {
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                 val url = SERVE_URL.find(event.text)?.value ?: return
                 onEdt { if (handler === process) onServerReady(url) }
