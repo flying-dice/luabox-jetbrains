@@ -18,6 +18,7 @@ import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.PopupHandler
+import com.intellij.ui.SearchTextField
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
@@ -36,6 +37,8 @@ import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingConstants
 import javax.swing.SwingUtilities
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreeSelectionModel
@@ -96,7 +99,12 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
     private val status = JLabel("", SwingConstants.CENTER)
     private val cards = CardLayout()
     private val center = JPanel(cards)
+    private val search = SearchTextField(false)
     private val projectDir = project.basePath
+
+    // The outlines from the last successful load, kept so the search box can
+    // re-filter the tree in memory without re-running `pds`.
+    private var loadedWorkspaces: List<WorkspaceOutline> = emptyList()
 
     init {
         tree.isRootVisible = false
@@ -104,14 +112,24 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
         tree.cellRenderer = EntryRenderer()
         installContextMenu()
+        installSearch()
 
         status.border = JBUI.Borders.empty(16)
         center.add(JBScrollPane(tree), CARD_TREE)
         center.add(JPanel(BorderLayout()).apply { add(status, BorderLayout.CENTER) }, CARD_STATUS)
 
-        add(buildToolbar(), BorderLayout.NORTH)
+        add(buildHeader(), BorderLayout.NORTH)
         add(center, BorderLayout.CENTER)
         refresh()
+    }
+
+    /** The toolbar (Refresh / Help) above a live filter box over the symbol tree. */
+    private fun buildHeader(): JComponent {
+        search.textEditor.emptyText.text = "Search symbols by name, FQN, or kind"
+        return JPanel(BorderLayout()).apply {
+            add(buildToolbar(), BorderLayout.NORTH)
+            add(search, BorderLayout.SOUTH)
+        }
     }
 
     private fun buildToolbar(): JComponent {
@@ -125,6 +143,34 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         val toolbar = ActionManager.getInstance().createActionToolbar(TOOLBAR_PLACE, group, true)
         toolbar.targetComponent = this
         return toolbar.component
+    }
+
+    /** Re-filter the tree against [loadedWorkspaces] as the search text changes. */
+    private fun installSearch() {
+        search.addDocumentListener(object : DocumentListener {
+            override fun insertUpdate(e: DocumentEvent) = applyFilter()
+            override fun removeUpdate(e: DocumentEvent) = applyFilter()
+            override fun changedUpdate(e: DocumentEvent) = applyFilter()
+        })
+    }
+
+    /**
+     * Rebuild the tree from the cached outlines, keeping symbols whose name / FQN
+     * / kind matches the search text (and the ancestors leading to them). A blank
+     * box shows the full tree; a query with no hits shows an empty-state message.
+     */
+    private fun applyFilter() {
+        val workspaces = loadedWorkspaces
+        if (workspaces.isEmpty()) return
+        val filter = search.text.trim()
+        val model = buildModel(workspaces, filter)
+        if (filter.isNotEmpty() && (model.root as DefaultMutableTreeNode).childCount == 0) {
+            showStatus("No symbols match “$filter”.")
+            return
+        }
+        tree.model = model
+        TreeUtil.expandAll(tree)
+        cards.show(center, CARD_TREE)
     }
 
     private fun refresh() {
@@ -143,12 +189,17 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
             }
             ApplicationManager.getApplication().invokeLater({
                 when {
-                    discovery is PdsResult.Err -> showStatus("Could not find PseudoScript workspaces.\n\n${discovery.message}")
-                    outlines.isNullOrEmpty() -> showStatus("No PseudoScript workspaces found under this project.")
+                    discovery is PdsResult.Err -> {
+                        loadedWorkspaces = emptyList()
+                        showStatus("Could not find PseudoScript workspaces.\n\n${discovery.message}")
+                    }
+                    outlines.isNullOrEmpty() -> {
+                        loadedWorkspaces = emptyList()
+                        showStatus("No PseudoScript workspaces found under this project.")
+                    }
                     else -> {
-                        tree.model = buildModel(outlines)
-                        TreeUtil.expandAll(tree)
-                        cards.show(center, CARD_TREE)
+                        loadedWorkspaces = outlines
+                        applyFilter()
                     }
                 }
             }, ModalityState.any())
@@ -236,29 +287,44 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         }
     }
 
-    private fun buildModel(workspaces: List<WorkspaceOutline>): DefaultTreeModel {
+    private fun buildModel(workspaces: List<WorkspaceOutline>, filter: String): DefaultTreeModel {
         val root = DefaultMutableTreeNode("PseudoScript")
         val grouped = workspaces.size > 1
+        val filtering = filter.isNotEmpty()
         for (workspace in workspaces) {
             // With several workspaces, nest each under its own header; with one,
             // attach its entries straight to the (hidden) root for a flat tree.
-            val container =
-                if (grouped) DefaultMutableTreeNode(TreeEntry.Workspace(workspace.label)).also { root.add(it) } else root
+            val container = if (grouped) DefaultMutableTreeNode(TreeEntry.Workspace(workspace.label)) else root
             when (val result = workspace.result) {
                 is PdsResult.Err ->
                     container.add(DefaultMutableTreeNode(TreeEntry.Message("could not load: ${result.message}")))
                 is PdsResult.Ok -> {
-                    val contextTitle = if (grouped) "Context — ${workspace.label}" else "Context overview"
-                    container.add(DefaultMutableTreeNode(TreeEntry.Context(workspace.dir, contextTitle)))
-                    attachSymbols(container, workspace.dir, result.value)
+                    // The context view isn't a symbol, so hide it while filtering.
+                    if (!filtering) {
+                        val contextTitle = if (grouped) "Context — ${workspace.label}" else "Context overview"
+                        container.add(DefaultMutableTreeNode(TreeEntry.Context(workspace.dir, contextTitle)))
+                    }
+                    attachSymbols(container, workspace.dir, result.value, filter)
                 }
             }
+            // Drop a grouped workspace header that filtered down to nothing.
+            if (grouped && container.childCount > 0) root.add(container)
         }
         return DefaultTreeModel(root)
     }
 
-    /** Nests [nodes] under [container] by structural `parent`, sorted by kind then name. */
-    private fun attachSymbols(container: DefaultMutableTreeNode, workspaceDir: String, nodes: List<PdsOutlineNode>) {
+    /**
+     * Nests [nodes] under [container] by structural `parent`, sorted by kind then
+     * name. When [filter] is non-blank, a symbol is kept only if it matches (on
+     * name / FQN / kind) or has a descendant that does, so the path to every hit
+     * stays visible.
+     */
+    private fun attachSymbols(
+        container: DefaultMutableTreeNode,
+        workspaceDir: String,
+        nodes: List<PdsOutlineNode>,
+        filter: String,
+    ) {
         val byFqn = nodes.associateBy { it.fqn }
         val children = HashMap<String, MutableList<PdsOutlineNode>>()
         val roots = ArrayList<PdsOutlineNode>()
@@ -271,11 +337,23 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
             }
         }
 
+        fun matches(node: PdsOutlineNode): Boolean =
+            node.name.contains(filter, ignoreCase = true) ||
+                node.fqn.contains(filter, ignoreCase = true) ||
+                node.kind.contains(filter, ignoreCase = true)
+
+        // Keep a node when it (or any descendant) matches; memoised over the tree.
+        val keep = HashMap<String, Boolean>()
+        fun keep(node: PdsOutlineNode): Boolean = keep.getOrPut(node.fqn) {
+            filter.isEmpty() || matches(node) || children[node.fqn].orEmpty().any { keep(it) }
+        }
+
         fun sorted(list: List<PdsOutlineNode>): List<PdsOutlineNode> =
             list.sortedWith(compareBy({ KIND_ORDER[it.kind] ?: KIND_ORDER.size }, { it.name }))
 
         fun attach(parentTreeNode: DefaultMutableTreeNode, parentFqn: String) {
             for (child in sorted(children[parentFqn].orEmpty())) {
+                if (!keep(child)) continue
                 val treeNode = DefaultMutableTreeNode(TreeEntry.Symbol(child, workspaceDir))
                 parentTreeNode.add(treeNode)
                 attach(treeNode, child.fqn)
@@ -283,6 +361,7 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         }
 
         for (rootNode in sorted(roots)) {
+            if (!keep(rootNode)) continue
             val treeNode = DefaultMutableTreeNode(TreeEntry.Symbol(rootNode, workspaceDir))
             container.add(treeNode)
             attach(treeNode, rootNode.fqn)

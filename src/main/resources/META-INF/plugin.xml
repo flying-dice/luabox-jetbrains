@@ -33,6 +33,9 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.4.0</b> — A <b>search box</b> in the PseudoScript tool window's
+                Structure tab: filter the workspace symbol tree live by name, FQN,
+                or kind, keeping the path to every match.</li>
             <li><b>0.3.0</b> — A <b>Help</b> button (top-right of the PseudoScript
                 tool window) with a quick intro to PseudoProgramming and a
                 paste-ready prompt that has any coding agent install the
