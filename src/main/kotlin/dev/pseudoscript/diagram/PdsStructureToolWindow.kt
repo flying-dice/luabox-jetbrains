@@ -1,31 +1,41 @@
 package dev.pseudoscript.diagram
 
 import com.intellij.icons.AllIcons
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.PopupHandler
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.content.ContentFactory
 import com.intellij.util.ui.tree.TreeUtil
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
+import dev.pseudoscript.lang.PseudoScriptIcons
 import java.awt.BorderLayout
 import java.awt.CardLayout
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.nio.file.Path
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.SwingConstants
+import javax.swing.SwingUtilities
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreeSelectionModel
@@ -93,7 +103,7 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         tree.showsRootHandles = true
         tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
         tree.cellRenderer = EntryRenderer()
-        tree.addTreeSelectionListener { onSelect() }
+        installContextMenu()
 
         status.border = JBUI.Borders.empty(16)
         center.add(JBScrollPane(tree), CARD_TREE)
@@ -109,6 +119,8 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
             add(object : AnAction("Refresh", "Rediscover workspaces and reload outlines", AllIcons.Actions.Refresh), DumbAware {
                 override fun actionPerformed(e: AnActionEvent) = refresh()
             })
+            // Right-aligned (RightAlignedToolbarAction) → lands at the top-right of the tool window.
+            add(PdsHelpAction())
         }
         val toolbar = ActionManager.getInstance().createActionToolbar(TOOLBAR_PLACE, group, true)
         toolbar.targetComponent = this
@@ -143,9 +155,75 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         }
     }
 
-    private fun onSelect() {
-        val selected = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return
-        openEntry(selected.userObject)
+    /**
+     * The tree's right-click menu. Right-clicking first selects the node under the
+     * cursor (Swing doesn't do this for us), then offers:
+     * - **Open Diagram** — render the node's C4 view or flow sequence (a context
+     *   overview or any declared symbol). This is deliberately not on left-click,
+     *   so browsing the tree doesn't keep spawning renders.
+     * - **Open Source** — jump to the symbol's declaration in its `.pds` file
+     *   (declared symbols only; the context view and headers have no location).
+     *
+     * Double-clicking a symbol also opens its source — the default tree action.
+     */
+    private fun installContextMenu() {
+        tree.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) = selectOnPopup(e)
+            override fun mouseReleased(e: MouseEvent) = selectOnPopup(e)
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    val entry = (tree.getPathForLocation(e.x, e.y)?.lastPathComponent as? DefaultMutableTreeNode)?.userObject
+                    if (entry is TreeEntry.Symbol) openSource(entry)
+                }
+            }
+            private fun selectOnPopup(e: MouseEvent) {
+                if (e.isPopupTrigger) tree.getPathForLocation(e.x, e.y)?.let { tree.selectionPath = it }
+            }
+        })
+        val group = DefaultActionGroup().apply {
+            add(object : AnAction("Open Diagram", "Render this node's PseudoScript diagram", PseudoScriptIcons.GREY), DumbAware {
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
+                override fun update(e: AnActionEvent) {
+                    val entry = selectedEntry()
+                    e.presentation.isEnabledAndVisible = entry is TreeEntry.Context || entry is TreeEntry.Symbol
+                }
+                override fun actionPerformed(e: AnActionEvent) = openEntry(selectedEntry())
+            })
+            add(object : AnAction("Open Source", "Open the .pds source for this symbol", AllIcons.Actions.EditSource), DumbAware {
+                override fun getActionUpdateThread() = ActionUpdateThread.EDT
+                override fun update(e: AnActionEvent) {
+                    e.presentation.isEnabledAndVisible = selectedSymbol() != null
+                }
+                override fun actionPerformed(e: AnActionEvent) = selectedSymbol()?.let(::openSource) ?: Unit
+            })
+        }
+        PopupHandler.installPopupMenu(tree, group, "PseudoScriptStructurePopup")
+    }
+
+    /** The selected tree node's payload, if any. */
+    private fun selectedEntry(): Any? =
+        (tree.lastSelectedPathComponent as? DefaultMutableTreeNode)?.userObject
+
+    /** The selected tree node if it is a declared symbol (the only kind with a source location). */
+    private fun selectedSymbol(): TreeEntry.Symbol? = selectedEntry() as? TreeEntry.Symbol
+
+    /**
+     * Open the `.pds` file declaring [symbol] and place the caret at its
+     * declaration. The module path maps to a file under the workspace
+     * (`a::b` → `a/b.pds`); `pds outline` line/col are 1-based, the editor's are 0.
+     */
+    private fun openSource(symbol: TreeEntry.Symbol) {
+        val node = symbol.node
+        val path = Path.of(symbol.workspaceDir, node.module.replace("::", "/") + ".pds")
+        val file = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(path)
+        if (file == null) {
+            NotificationGroupManager.getInstance().getNotificationGroup("PseudoScript")
+                .createNotification("PseudoScript", "Source file not found: $path", NotificationType.WARNING)
+                .notify(project)
+            return
+        }
+        OpenFileDescriptor(project, file, (node.line - 1).coerceAtLeast(0), (node.col - 1).coerceAtLeast(0))
+            .navigate(true)
     }
 
     /** Opens a [TreeEntry.Context] or [TreeEntry.Symbol] as a diagram; ignores the rest. */

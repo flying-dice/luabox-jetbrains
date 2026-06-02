@@ -5,6 +5,7 @@ import com.google.gson.JsonSyntaxException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import dev.pseudoscript.settings.PseudoScriptSettings
+import java.io.File
 import java.nio.charset.StandardCharsets
 
 /**
@@ -38,17 +39,66 @@ object PdsCli {
     private val gson = Gson()
     private const val TIMEOUT_MS = 30_000
 
+    /** Directories the hidden-workspace scan never enters (build output + VCS/IDE noise). */
+    private val PRUNE = setOf("target", "pds_modules", "node_modules", "build", "dist", ".git", ".gradle", ".idea", ".vscode")
+
     /**
-     * Every `pds.toml` workspace under [projectDir], as absolute directories
-     * (`pds list` → `monorepo::discover`: skips `target`/`pds_modules`/hidden,
-     * and a workspace owns its subtree). A repo may hold several side by side.
+     * Every `pds.toml` workspace under [projectDir], as absolute directories. A
+     * repo may hold several side by side.
+     *
+     * `pds list` (→ `monorepo::discover`) skips `target`/`pds_modules` and never
+     * descends into *hidden* directories — so a model kept by convention in a
+     * hidden folder like `.pds/` is invisible to it. We recover those: union the
+     * `pds list` result with [hiddenWorkspaces], which runs `pds list` on each
+     * hidden directory as an explicit root (only *descending into* hidden dirs is
+     * skipped — a hidden dir works fine as the root).
      */
-    fun workspaces(projectDir: String): PdsResult<List<String>> =
-        when (val raw = run(projectDir, "list", projectDir)) {
+    fun workspaces(projectDir: String): PdsResult<List<String>> {
+        val primary = run(projectDir, "list", projectDir)
+        val listed = when (primary) {
             is PdsResult.Ok ->
-                PdsResult.Ok(raw.value.lineSequence().map(String::trim).filter(String::isNotEmpty).toList())
-            is PdsResult.Err -> raw
+                primary.value.lineSequence().map(String::trim).filter(String::isNotEmpty).toList()
+            is PdsResult.Err -> emptyList()
         }
+        val all = (listed + hiddenWorkspaces(projectDir)).distinct()
+        return when {
+            all.isNotEmpty() -> PdsResult.Ok(all)
+            // Nothing anywhere — surface why `pds list` came up empty.
+            primary is PdsResult.Err -> primary
+            else -> PdsResult.Ok(emptyList())
+        }
+    }
+
+    /**
+     * Workspaces in hidden directories that `pds list` skips. Walks the visible
+     * tree under [projectDir]; for each hidden directory it would have skipped,
+     * runs `pds list` on that directory as an explicit root and collects what it
+     * finds. Stops descending at hidden dirs (their subtree is covered by that
+     * `pds list`) and prunes build / VCS noise so it stays cheap — in practice
+     * only the conventional `.pds/` triggers an extra call.
+     */
+    private fun hiddenWorkspaces(projectDir: String): List<String> {
+        val root = File(projectDir)
+        if (!root.isDirectory) return emptyList()
+        val found = mutableListOf<String>()
+        fun visit(dir: File) {
+            val children = dir.listFiles() ?: return
+            for (child in children) {
+                if (!child.isDirectory || child.name in PRUNE) continue
+                if (child.name.startsWith(".")) {
+                    when (val r = run(child.absolutePath, "list", child.absolutePath)) {
+                        is PdsResult.Ok ->
+                            r.value.lineSequence().map(String::trim).filter(String::isNotEmpty).forEach(found::add)
+                        is PdsResult.Err -> Unit
+                    }
+                } else {
+                    visit(child)
+                }
+            }
+        }
+        visit(root)
+        return found
+    }
 
     /** The workspace's symbol outline, for the structure tree. */
     fun outline(workspaceDir: String): PdsResult<List<PdsOutlineNode>> =

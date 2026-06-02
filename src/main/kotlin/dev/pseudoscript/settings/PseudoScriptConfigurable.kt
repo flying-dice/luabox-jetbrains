@@ -3,6 +3,7 @@ package dev.pseudoscript.settings
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.ui.EditorNotifications
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.FormBuilder
 import javax.swing.JComponent
@@ -37,6 +38,9 @@ class PseudoScriptConfigurable : Configurable {
 
     override fun apply() {
         settings.pdsPath = effectivePath()
+        // The missing-binary banner is keyed on the configured path; refresh open
+        // editors so it clears (or reappears) without reopening files.
+        EditorNotifications.updateAll()
     }
 
     override fun reset() {

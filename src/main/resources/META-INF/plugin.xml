@@ -33,6 +33,12 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.3.0</b> — A <b>Help</b> button (top-right of the PseudoScript
+                tool window) with a quick intro to PseudoProgramming and a
+                paste-ready prompt that has any coding agent install the
+                PseudoScript skill (<code>pds skill</code>) and write your model.
+                Plus an editor banner warning when the <code>pds</code> binary is
+                missing.</li>
             <li><b>0.2.0</b> — A visual <b>PseudoScript</b> tool window:
                 <ul>
                     <li><b>Structure</b> — the workspace symbol tree (monorepo-aware);
@@ -76,6 +82,18 @@
             language="PseudoScript"
             implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
 
+        <!--
+          Native Structure view (⌘7) for .pds files. LSP4IJ's structure-view support
+          is language-scoped: its generic builder delegates to the
+          lang.psiStructureViewFactory registered for the file's Language, and LSP4IJ
+          only self-registers for TEXT / textmate. Point PseudoScript at the same
+          factory so the LSP `documentSymbol` outline (served by `pds lsp`) populates
+          the Structure tool window.
+        -->
+        <lang.psiStructureViewFactory
+            language="PseudoScript"
+            implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
+
         <lang.commenter
             language="PseudoScript"
             implementationClass="dev.pseudoscript.lang.PseudoScriptCommenter"/>
@@ -118,6 +136,14 @@
         <notificationGroup
             id="PseudoScript"
             displayType="BALLOON"/>
+
+        <!--
+          Warns atop `.pds` / `pds.toml` files when the `pds` binary is missing:
+          highlighting works, but diagnostics / diagrams / docs need it. Clears
+          once a valid path is configured.
+        -->
+        <editorNotificationProvider
+            implementation="dev.pseudoscript.notification.PdsMissingBinaryEditorNotificationProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
