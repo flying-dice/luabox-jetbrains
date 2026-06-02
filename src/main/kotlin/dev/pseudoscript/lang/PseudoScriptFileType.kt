@@ -7,7 +7,7 @@ import javax.swing.Icon
 object PseudoScriptFileType : LanguageFileType(PseudoScriptLanguage) {
     override fun getName(): String = "PseudoScript"
 
-    override fun getDescription(): String = "PseudoScript architecture model"
+    override fun getDescription(): String = "PseudoScript pseudoprogramming source"
 
     override fun getDefaultExtension(): String = "pds"
 

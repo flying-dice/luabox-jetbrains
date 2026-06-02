@@ -31,6 +31,11 @@ dependencies {
 
     implementation(kotlin("stdlib"))
 
+    // Pure-Java vector SVG renderer for the diagram panel — paints `pds svg`
+    // output to a Graphics2D so it stays crisp at any zoom. Bundled into the
+    // plugin (the IDE's own jsvg is internal and version-bound).
+    implementation("com.github.weisj:jsvg:1.4.0")
+
     // BDD acceptance tests: Gherkin features run by the Cucumber JUnit Platform
     // engine. The lexer is a plain class, so these need no running IDE.
     testImplementation("io.cucumber:cucumber-java:7.18.0")
