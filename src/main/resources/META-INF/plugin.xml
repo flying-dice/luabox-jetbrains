@@ -4,10 +4,11 @@
     <vendor email="hello@pseudoscript.dev" url="https://pseudoscript.dev">PseudoScript</vendor>
 
     <description><![CDATA[
-        <p>Language support for <b>PseudoScript</b> (<code>.pds</code>) — an
-        architecture-modeling language that reads like pseudocode, expresses
-        C4-style structure (system / container / component / person), and
-        compiles to SVG diagrams.</p>
+        <p>Language support for <b>PseudoScript</b> (<code>.pds</code>) — a
+        <b>pseudoprogramming</b> language: you code the abstraction and let it
+        autogenerate, rather than hand-maintaining the output. It reads like
+        pseudocode, expresses C4-style structure (system / container /
+        component / person), and compiles to SVG diagrams.</p>
 
         <h3>Features</h3>
         <ul>
@@ -84,6 +85,29 @@
             instance="dev.pseudoscript.settings.PseudoScriptConfigurable"
             id="dev.pseudoscript.settings.PseudoScriptConfigurable"
             displayName="PseudoScript"/>
+
+        <!--
+          The diagram editor: opens a synthetic DiagramVirtualFile (produced by
+          the structure tool window) into a zoomable SVG canvas rendered from
+          `pds svg`. HIDE_DEFAULT_EDITOR keeps the text editor off it.
+        -->
+        <fileEditorProvider
+            implementation="dev.pseudoscript.diagram.DiagramFileEditorProvider"/>
+
+        <!--
+          The structure tool window: the workspace's symbol tree (from
+          `pds outline`); selecting a node renders its diagram in the editor area.
+        -->
+        <toolWindow
+            id="PseudoScript"
+            anchor="right"
+            icon="dev.pseudoscript.lang.PseudoScriptIcons.GREY"
+            factoryClass="dev.pseudoscript.diagram.PdsStructureToolWindowFactory"/>
+
+        <!-- Balloon shown after a diagram is exported to disk. -->
+        <notificationGroup
+            id="PseudoScript"
+            displayType="BALLOON"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
@@ -112,7 +136,16 @@
             id="dev.pseudoscript.PdsTomlActions"
             class="dev.pseudoscript.actions.PdsTomlActionGroup"
             text="PseudoScript"
-            popup="true">
+            popup="true"
+            icon="dev.pseudoscript.lang.PseudoScriptIcons.GREY">
+            <!-- Shown on a `.pds` source file. -->
+            <action
+                id="dev.pseudoscript.OpenDiagram"
+                class="dev.pseudoscript.diagram.OpenDiagramAction"
+                text="Open Diagram"
+                description="Render this symbol's PseudoScript diagram"
+                icon="dev.pseudoscript.lang.PseudoScriptIcons.GREY"/>
+            <!-- Shown on a `pds.toml` project root. -->
             <action
                 id="dev.pseudoscript.BuildDocs"
                 class="dev.pseudoscript.actions.BuildDocsAction"

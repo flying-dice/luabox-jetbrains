@@ -20,19 +20,27 @@ private const val PDS_TOML = "pds.toml"
 private fun isPdsToml(file: VirtualFile?): Boolean =
     file != null && !file.isDirectory && file.name == PDS_TOML
 
+/** True when `file` is a `.pds` source file. */
+private fun isPdsSource(file: VirtualFile?): Boolean =
+    file != null && !file.isDirectory && file.extension == "pds"
+
 /** Show/enable the action only when the context file is a `pds.toml`. */
 private fun AnActionEvent.gateOnPdsToml() {
     presentation.isEnabledAndVisible = isPdsToml(getData(CommonDataKeys.VIRTUAL_FILE))
 }
 
 /**
- * The "PseudoScript" submenu on a `pds.toml` context menu. Hidden everywhere
- * else; its child actions inherit that visibility.
+ * The "PseudoScript" submenu, shown on a `pds.toml` (Build / Serve Docs) or a
+ * `.pds` source file (Open Diagram). Each child action gates its own visibility
+ * for the file kind it applies to, so the menu lists only relevant items.
  */
 class PdsTomlActionGroup : DefaultActionGroup() {
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
-    override fun update(e: AnActionEvent) = e.gateOnPdsToml()
+    override fun update(e: AnActionEvent) {
+        val file = e.getData(CommonDataKeys.VIRTUAL_FILE)
+        e.presentation.isEnabledAndVisible = isPdsToml(file) || isPdsSource(file)
+    }
 }
 
 /**

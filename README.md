@@ -8,6 +8,12 @@ The IntelliJ-platform plugin for **PseudoScript** (`.pds`) — syntax & semantic
 highlighting, diagnostics, navigation, hover, formatting, and a docs-generation
 menu, all in your JetBrains IDE.
 
+**PseudoScript is a pseudoprogramming language** — you code the abstraction and
+let it autogenerate, rather than hand-maintaining the output. It's the modern
+descendant of codegen and UML, renewed now that LLMs can generate and maintain
+faithfully against a spec. The `.pds` files this plugin edits compile to
+C4-style diagrams and docs via the `pds` toolchain.
+
 **[Install from the JetBrains Marketplace →](https://plugins.jetbrains.com/plugin/32021-pseudoscript)**
 
 > **Looking for the language itself?** PseudoScript — the language, its
