@@ -33,6 +33,16 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.0</b> — A visual <b>PseudoScript</b> tool window:
+                <ul>
+                    <li><b>Structure</b> — the workspace symbol tree (monorepo-aware);
+                        click a node, or <i>PseudoScript &gt; Open Diagram</i> in the
+                        editor, to render its C4 view or flow sequence as a zoomable,
+                        pannable diagram with SVG / PNG export.</li>
+                    <li><b>Docs</b> — build &amp; serve the documentation site and
+                        preview it live (auto-reloading) in an embedded browser.</li>
+                </ul>
+                Diagrams follow the IDE's light / dark theme.</li>
             <li><b>0.1.0</b> — Initial release: syntax highlighting, LSP-backed
                 diagnostics / hover / formatting / go-to-definition, and a
                 Build / Serve Docs context menu on <code>pds.toml</code>.</li>
