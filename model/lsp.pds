@@ -1,0 +1,43 @@
+//! LSP bridge — registers the `pds lsp` stdio server with LSP4IJ and routes its
+//! semantic tokens to the plugin's colours. The plugin supplies a launcher and a
+//! colour map; LSP4IJ owns the protocol and lifecycle.
+
+/// Wires the `pds lsp` language server into the IDE via LSP4IJ.
+public container LspBridge for main::PseudoScriptPlugin;
+
+/// Hands LSP4IJ the connection provider for the `pseudoscript` server.
+public component ServerFactory for LspBridge {
+  /// Register the launcher with the LSP4IJ runtime.
+  #[manual]
+  public Register(): void {
+    main::Lsp4ij.registerServer()
+  }
+}
+
+/// The launcher LSP4IJ starts: it spawns `pds lsp` with the project root as the
+/// working directory so the server resolves `pds.toml` and workspace FQNs.
+public component LanguageServer for LspBridge {
+  /// Guard on binary availability, then spawn `pds lsp`. Front-loading the check
+  /// turns an opaque "cannot run program" into a clear setup message.
+  #[manual]
+  public Start(): Result<void, main::CliError> {
+    ok: bool = config::BinaryCheck.isAvailable()
+    if (!ok) {
+      message: string = config::BinaryCheck.notFoundMessage()
+      return Err(main::CliError from { message })
+    }
+    main::Pds.lsp()
+    return Ok
+  }
+}
+
+/// Maps `pds lsp` semantic tokens onto the plugin's colour keys: the lexer paints
+/// the base layer, this refines identifiers (declaration vs call, role-aware).
+public component SemanticTokens for LspBridge;
+
+/// A missing binary is explained, not dumped as a raw process error.
+feature MissingBinaryIsExplained for LanguageServer {
+  given "the `pds` binary cannot be found on PATH"
+  when "the language server is asked to start"
+  then "startup fails with a clear setup message pointing at Settings"
+}

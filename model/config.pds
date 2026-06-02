@@ -1,0 +1,57 @@
+//! Configuration — the `pds` binary path, the one availability check everything
+//! shares, and the banner shown when the binary can't be found.
+
+/// Settings, binary detection, and user-facing setup guidance.
+public container Configuration for main::PseudoScriptPlugin;
+
+/// Application-wide persistent store of the `pds` binary path. A blank value
+/// falls back to the bare name `pds`, resolved on PATH.
+public component Settings for Configuration {
+  /// The configured path (PATH name or absolute).
+  pdsPath(): string;
+  /// Persist a new path.
+  setPdsPath(path: string): void;
+}
+
+/// "Can we reach `pds`?" — the single check the LSP launcher, the banner, and the
+/// diagram CLI wrapper all lean on, so the user gets one consistent answer.
+public component BinaryCheck for Configuration {
+  /// True if the configured `pds` resolves on PATH, or is an executable file.
+  isAvailable(): bool;
+  /// The headline shown when it can't be found, naming the path that was tried.
+  notFoundMessage(): string;
+}
+
+/// The settings page (Settings > Languages & Frameworks > PseudoScript).
+public component SettingsForm for Configuration {
+  /// Save the edited path, then refresh banners so the missing-binary warning
+  /// clears (or reappears) without reopening any files.
+  #[manual]
+  public ApplySettings(path: string): void {
+    Settings.setPdsPath(path)
+    main::Intellij.refreshNotifications()
+  }
+}
+
+/// Warns atop `.pds` / `pds.toml` files when the binary is missing — highlighting
+/// still works, but diagnostics, diagrams, and docs need it.
+public component MissingBinaryBanner for Configuration {
+  /// A banner message when `pds` is unreachable; nothing when it resolves.
+  #[manual]
+  public Render(): Option<string> {
+    ok: bool = BinaryCheck.isAvailable()
+    if (ok) {
+      return None
+    }
+    message: string = BinaryCheck.notFoundMessage()
+    return Some(message)
+  }
+}
+
+/// The banner guides setup and disappears once configured.
+feature MissingBinaryBannerShown for Configuration {
+  given "the configured `pds` path does not resolve"
+  when "a `.pds` or `pds.toml` file is open"
+  then "a warning banner offers to open Settings and the install page"
+  and "the banner clears once a valid path is set"
+}

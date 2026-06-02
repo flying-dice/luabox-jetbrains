@@ -1,0 +1,6 @@
+# PseudoScript project root (LANG.md §8.1).
+[doc]
+name = "PseudoScript IntelliJ Plugin"
+
+[dependencies]
+pseudoscript = { git = "git@github.com:flying-dice/pseudoscript.git", path = "model" }

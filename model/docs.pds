@@ -1,0 +1,43 @@
+//! Docs — build & serve the documentation site (`pds doc`) and preview it live in
+//! an embedded browser, plus the `pds.toml` context-menu actions.
+
+/// The Docs tab (live preview) and the Build / Serve Docs actions.
+public container Docs for main::PseudoScriptPlugin;
+
+/// Embedded live preview: runs `pds doc --watch`, loads the served site in a JCEF
+/// browser, and auto-reloads as the model changes.
+public component DocsPanel for Docs {
+  /// Stop any running server, resolve the workspace, and start `pds doc --watch`;
+  /// the panel shows the site once the server announces its URL.
+  #[manual]
+  public Serve(workspaceDir: string): void {
+    self.stopServer()
+    main::Pds.doc(workspaceDir)
+  }
+
+  /// Kill the running doc server, if any.
+  stopServer(): void;
+}
+
+/// The `pds.toml` context-menu actions, run with a console + stop button.
+public component DocActions for Docs {
+  /// Generate the documentation site (`pds doc`).
+  #[manual]
+  public BuildDocs(workspaceDir: string): void {
+    main::Pds.doc(workspaceDir)
+  }
+
+  /// Generate and serve it (`pds doc --serve`).
+  #[manual]
+  public ServeDocs(workspaceDir: string): void {
+    main::Pds.doc(workspaceDir)
+  }
+}
+
+/// The site is previewed live, in-IDE, and reloads on edit.
+feature LiveDocsPreview for DocsPanel {
+  given "a workspace with a `pds.toml`"
+  when "the developer runs Build & Serve Docs"
+  then "`pds doc` serves the site locally"
+  and "it loads in an embedded browser and reloads as files change"
+}

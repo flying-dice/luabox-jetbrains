@@ -1,0 +1,156 @@
+//! Diagrams — the PseudoScript tool window's Structure tab and the zoomable SVG
+//! diagram editor. Both are fed by shelling out to the `pds` CLI (`list`,
+//! `outline`, `svg`); the heavy lifting lives in the toolchain, so this subsystem
+//! is mostly orchestration: discover, fetch, render.
+
+/// The Structure tree and the SVG diagram editor, plus the right-click action and
+/// the CLI wrapper that backs them.
+public container Diagrams for main::PseudoScriptPlugin;
+
+/// Thin wrapper over the `pds` CLI for diagram data. Runs the configured binary
+/// with the workspace as the working directory; every call returns a value for
+/// the UI or a `CliError` (off the EDT — these block).
+public component Cli for Diagrams {
+  /// Every `pds.toml` workspace under the project root (`pds list`).
+  public workspaces(projectDir: string): Result<string[], main::CliError> {
+    raw: Result<string[], main::CliError> = main::Pds.list(projectDir)
+    if (raw.isErr) {
+      return Err(raw.error)
+    }
+    return Ok(raw.value)
+  }
+
+  /// A workspace's symbol outline (`pds outline`), parsed from JSON.
+  public outline(workspaceDir: string): Result<main::PdsOutlineNode[], main::CliError> {
+    return main::Pds.outline(workspaceDir)
+  }
+
+  /// A symbol's fitting diagram (`pds svg --symbol`), in the IDE theme.
+  public symbolSvg(workspaceDir: string, fqn: string, theme: string): Result<string, main::CliError> {
+    return main::Pds.svg(workspaceDir, fqn, theme)
+  }
+
+  /// The whole-workspace context diagram (`pds svg --view context`), in the theme.
+  public contextSvg(workspaceDir: string, theme: string): Result<string, main::CliError> {
+    return main::Pds.svg(workspaceDir, "context", theme)
+  }
+}
+
+/// The Structure tab: discovers workspaces, outlines each, and draws the tree;
+/// selecting a node opens its diagram.
+public component StructureTree for Diagrams {
+  /// Discover every workspace, load each outline, and build the tree. All `pds`
+  /// calls run off the EDT; the first failure surfaces as the tree's status.
+  #[manual]
+  public Refresh(projectDir: string): Result<void, main::CliError> {
+    roots: Result<string[], main::CliError> = Cli.workspaces(projectDir)
+    if (roots.isErr) {
+      return Err(roots.error)
+    }
+    for (ws in roots.value) {
+      nodes: Result<main::PdsOutlineNode[], main::CliError> = Cli.outline(ws)
+      if (nodes.isErr) {
+        return Err(nodes.error)
+      }
+      self.attach(ws, nodes.value)
+    }
+    return Ok
+  }
+
+  /// Build and attach one workspace's symbols as a subtree, nested by `parent`.
+  attach(workspaceDir: string, nodes: main::PdsOutlineNode[]): void;
+
+  /// A tree node was selected: open its fitting diagram.
+  #[manual]
+  public OpenEntry(node: main::PdsOutlineNode, workspaceDir: string): void {
+    target: main::DiagramTarget = main::DiagramTarget from { workspaceDir, node }
+    DiagramService.show(target)
+  }
+}
+
+/// Opens diagrams in the main editor area, reusing one tab per project so
+/// successive picks refresh the same view rather than spawning tabs.
+public component DiagramService for Diagrams {
+  /// Point the reused diagram tab at [target], render it, and focus the tab.
+  public show(target: main::DiagramTarget): void {
+    DiagramEditor.Render(target)
+    main::Intellij.openEditor(target.title)
+  }
+}
+
+/// The zoomable, pannable SVG canvas: renders `pds svg` output with zoom / pan
+/// and SVG / PNG export, following the IDE's light / dark theme.
+public component DiagramEditor for Diagrams {
+  /// Re-render the current target: fetch its SVG off the EDT, swap it in on the
+  /// EDT. No fitting symbol means the whole-workspace context view; otherwise the
+  /// symbol's own fitting view.
+  public Render(target: main::DiagramTarget): Result<void, main::CliError> {
+    theme: string = self.theme()
+    fqn: Option<string> = target.fqn
+    if (fqn.isNone) {
+      ctx: Result<string, main::CliError> = Cli.contextSvg(target.workspaceDir, theme)
+      if (ctx.isErr) {
+        return Err(ctx.error)
+      }
+      self.draw(ctx.value)
+      return Ok
+    }
+    svg: Result<string, main::CliError> = Cli.symbolSvg(target.workspaceDir, fqn.value, theme)
+    if (svg.isErr) {
+      return Err(svg.error)
+    }
+    self.draw(svg.value)
+    return Ok
+  }
+
+  /// The active IDE theme name (`light` / `dark`).
+  theme(): string;
+  /// Paint a parsed SVG document onto the canvas.
+  draw(svg: string): void;
+
+  /// Export the shown diagram to disk — SVG verbatim, or PNG rasterised at 2×.
+  #[manual]
+  public Export(): void;
+}
+
+/// Right-click → Open Diagram on a `.pds` source file: resolve the symbol under
+/// the caret and render it, falling back to the context view.
+public component DiagramAction for Diagrams {
+  /// Outline the workspace, match the caret's declaration line, open the diagram.
+  /// No match opens the whole-workspace context view instead.
+  #[manual]
+  public OpenDiagram(workspaceDir: string, line: number): Result<void, main::CliError> {
+    outline: Result<main::PdsOutlineNode[], main::CliError> = Cli.outline(workspaceDir)
+    if (outline.isErr) {
+      return Err(outline.error)
+    }
+    found: Option<main::PdsOutlineNode> = self.resolveTarget(outline.value, line)
+    if (found.isNone) {
+      ctx: main::DiagramTarget = main::DiagramTarget from { workspaceDir }
+      DiagramService.show(ctx)
+      return Ok
+    }
+    picked: main::DiagramTarget = main::DiagramTarget from { workspaceDir, found.value }
+    DiagramService.show(picked)
+    return Ok
+  }
+
+  /// The outline node declared on [line], disambiguated by the caret's text.
+  resolveTarget(nodes: main::PdsOutlineNode[], line: number): Option<main::PdsOutlineNode>;
+}
+
+/// The tree mirrors every workspace in the repo, monorepo-aware.
+feature StructureTreeListsWorkspaces for StructureTree {
+  given "a repository holding one or more `pds.toml` workspaces"
+  when "the Structure tab refreshes"
+  then "each workspace's symbols appear, nested by their parent"
+  and "flow entry points are marked distinctly from structural nodes"
+}
+
+/// Selecting a node renders the view that fits it.
+feature SelectingANodeRenders for DiagramEditor {
+  given "the structure tree is populated"
+  when "the developer selects a symbol"
+  then "a triggered flow renders as a sequence diagram"
+  and "a structural node renders as its C4 view"
+}
