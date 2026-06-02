@@ -1,4 +1,11 @@
-<idea-plugin>
+<!--
+  require-restart: this plugin registers non-dynamic extension points (a
+  <fileType> association and an LSP4IJ <server>), which the platform can't load
+  on the fly. Declaring it forces the IDE to surface the Restart button on
+  install/update instead of half-applying a dynamic load that leaves the plugin
+  installed but inert until the next restart.
+-->
+<idea-plugin require-restart="true">
     <id>dev.pseudoscript.pds</id>
     <name>PseudoScript</name>
     <vendor email="hello@pseudoscript.dev" url="https://pseudoscript.dev">PseudoScript</vendor>
@@ -33,6 +40,10 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.6.0</b> — The plugin now requires an IDE restart on
+                install / update. It registers a file type and an LSP server,
+                which can't be loaded dynamically, so the IDE prompts to restart
+                instead of silently installing without effect.</li>
             <li><b>0.5.0</b> — Modernised deprecated platform APIs; the minimum
                 supported IDE is now <b>2025.1</b>.</li>
             <li><b>0.4.0</b> — A <b>search box</b> in the PseudoScript tool window's
