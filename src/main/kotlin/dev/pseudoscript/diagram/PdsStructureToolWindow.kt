@@ -430,6 +430,7 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
                     "component" -> AllIcons.Nodes.Class
                     "data" -> AllIcons.Nodes.Field
                     "callable" -> AllIcons.Nodes.Method
+                    "feature" -> AllIcons.Nodes.Test
                     else -> AllIcons.Nodes.Unknown
                 }
             }
@@ -439,7 +440,9 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
         private const val CARD_TREE = "tree"
         private const val CARD_STATUS = "status"
         private const val TOOLBAR_PLACE = "PseudoScriptStructure"
-        private val KIND_ORDER =
-            mapOf("person" to 0, "system" to 1, "container" to 2, "component" to 3, "data" to 4, "callable" to 5)
+        private val KIND_ORDER = mapOf(
+            "person" to 0, "system" to 1, "container" to 2, "component" to 3,
+            "data" to 4, "callable" to 5, "feature" to 6,
+        )
     }
 }
