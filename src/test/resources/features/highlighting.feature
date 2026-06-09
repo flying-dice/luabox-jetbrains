@@ -341,6 +341,100 @@ Feature: PseudoScript syntax-highlighting tokenisation
       | STRING     | "no card is issued"        |
       | RBRACE     | }                          |
 
+  Scenario: A constant declaration names a value (§2.3, §3.6)
+    Given the PseudoScript source:
+      """
+      public constant PI = 3.14
+      constants = PI
+      """
+    When it is tokenised
+    Then the tokens are:
+      | type       | text      |
+      | KEYWORD    | public    |
+      | KEYWORD    | constant  |
+      | VARIABLE   | PI        |
+      | OPERATOR   | =         |
+      | NUMBER     | 3.14      |
+      | IDENTIFIER | constants |
+      | OPERATOR   | =         |
+      | IDENTIFIER | PI        |
+
+  Scenario: Each operator lexes as a distinct token; two-character operators win (§7.5)
+    Given the PseudoScript source:
+      """
+      a = b + c - d * e / f % g
+      h = i == j != k < l > m <= n >= o
+      t = !u
+      v = -w
+      """
+    When it is tokenised
+    Then the tokens are:
+      | type       | text |
+      | IDENTIFIER | a    |
+      | OPERATOR   | =    |
+      | IDENTIFIER | b    |
+      | OPERATOR   | +    |
+      | IDENTIFIER | c    |
+      | OPERATOR   | -    |
+      | IDENTIFIER | d    |
+      | OPERATOR   | *    |
+      | IDENTIFIER | e    |
+      | OPERATOR   | /    |
+      | IDENTIFIER | f    |
+      | OPERATOR   | %    |
+      | IDENTIFIER | g    |
+      | IDENTIFIER | h    |
+      | OPERATOR   | =    |
+      | IDENTIFIER | i    |
+      | OPERATOR   | ==   |
+      | IDENTIFIER | j    |
+      | OPERATOR   | !=   |
+      | IDENTIFIER | k    |
+      | OPERATOR   | <    |
+      | IDENTIFIER | l    |
+      | OPERATOR   | >    |
+      | IDENTIFIER | m    |
+      | OPERATOR   | <=   |
+      | IDENTIFIER | n    |
+      | OPERATOR   | >=   |
+      | IDENTIFIER | o    |
+      | IDENTIFIER | t    |
+      | OPERATOR   | =    |
+      | OPERATOR   | !    |
+      | IDENTIFIER | u    |
+      | IDENTIFIER | v    |
+      | OPERATOR   | =    |
+      | OPERATOR   | -    |
+      | IDENTIFIER | w    |
+
+  Scenario: A boolean-or operand is not a union variant (§7.5)
+    Given the PseudoScript source:
+      """
+      p = q && r || s
+      """
+    When it is tokenised
+    Then the tokens are:
+      | type       | text |
+      | IDENTIFIER | p    |
+      | OPERATOR   | =    |
+      | IDENTIFIER | q    |
+      | OPERATOR   | &&   |
+      | IDENTIFIER | r    |
+      | OPERATOR   | \|\| |
+      | IDENTIFIER | s    |
+
+  Scenario: A lone ampersand is a bad character; only && is an operator (§7.5)
+    Given the PseudoScript source:
+      """
+      a & b
+      """
+    When it is tokenised
+    Then the tokens are:
+      | type          | text |
+      | IDENTIFIER    | a    |
+      | BAD_CHARACTER | &    |
+      | IDENTIFIER    | b    |
+
   Scenario: Declaration, variant and type roles mirror the LSP offline (§6, §8)
     Given the PseudoScript source:
       """

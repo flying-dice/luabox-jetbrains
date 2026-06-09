@@ -67,6 +67,7 @@ class PseudoScriptSyntaxHighlighter : SyntaxHighlighterBase() {
             T.PROPERTY to PROPERTY,
             T.ENUM_MEMBER to ENUM_MEMBER,
             T.FUNCTION_CALL to FUNCTION_CALL,
+            T.VARIABLE to LOCAL_VARIABLE,
             T.STRING to STRING,
             T.NUMBER to NUMBER,
             T.LINE_COMMENT to LINE_COMMENT,

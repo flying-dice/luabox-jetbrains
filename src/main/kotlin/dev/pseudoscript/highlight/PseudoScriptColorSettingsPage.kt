@@ -69,9 +69,13 @@ class PseudoScriptColorSettingsPage : ColorSettingsPage {
                 }
             }
 
+            /// Accounts per customer (§3.6).
+            public constant LIMIT = 5
+
             #[diagram(c4)]
             system Bank {
                 balance: number = 42
+                solvent = balance >= 0 && balance % 2 == 0
             }
 
             data Account = | Checking { id: uuid } | Savings

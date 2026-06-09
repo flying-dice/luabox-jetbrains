@@ -25,10 +25,11 @@ object PseudoScriptTokenTypes {
     // semantic tokens offline (LANG.md §6/§8). They map to the same colour keys
     // the LSP semantic provider uses, so the file looks the same with or without
     // the server (minus diagnostics/hover/navigation).
-    @JvmField val NAMESPACE = PseudoScriptTokenType("NAMESPACE") // node/feature/alias name, `for` parent
+    @JvmField val NAMESPACE = PseudoScriptTokenType("NAMESPACE") // node/feature name, `for` parent
     @JvmField val PROPERTY = PseudoScriptTokenType("PROPERTY")   // `.field` access
     @JvmField val ENUM_MEMBER = PseudoScriptTokenType("ENUM_MEMBER") // `| Variant`
     @JvmField val FUNCTION_CALL = PseudoScriptTokenType("FUNCTION_CALL") // `.method(` call
+    @JvmField val VARIABLE = PseudoScriptTokenType("VARIABLE")   // `constant NAME` (§3.6)
 
     @JvmField val STRING = PseudoScriptTokenType("STRING")
     @JvmField val NUMBER = PseudoScriptTokenType("NUMBER")
