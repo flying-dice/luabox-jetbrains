@@ -23,6 +23,12 @@
                 page (bundled, no server needed).</li>
             <li><b>Diagnostics, hover, formatting, and go-to-definition</b> via
                 the <code>pds lsp</code> language server.</li>
+            <li><b>Diagrams</b> — click a node in the PseudoScript tool window's
+                Structure tab (or <i>PseudoScript &gt; Open Diagram</i> in the
+                editor) to render its fitting view: C4 context / container /
+                component, a triggered flow's sequence, a data type's entity
+                view, or a feature's flow diagram (<code>pds svg</code>), with
+                SVG / PNG export.</li>
             <li><b>Build / Serve Docs</b> — right-click a <code>pds.toml</code>
                 to generate the documentation site (<code>pds doc</code>) or
                 serve it locally (<code>pds doc --serve</code>).</li>
@@ -40,6 +46,18 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.7.0</b> — Caught up with the latest PseudoScript language
+                and toolchain:
+                <ul>
+                    <li>Highlighting for the new <b>operators</b>
+                        (<code>+ - * / % == != &lt;= &gt;= &amp;&amp; ||</code>)
+                        and <b><code>constant</code></b> declarations; the removed
+                        <code>alias</code> keyword no longer highlights.</li>
+                    <li>The Structure tree renders each symbol's fitting diagram,
+                        now including <b>data entity views</b> and <b>feature flow
+                        diagrams</b>; feature entries get a proper icon and sort
+                        order.</li>
+                </ul></li>
             <li><b>0.6.0</b> — The plugin now requires an IDE restart on
                 install / update. It registers a file type and an LSP server,
                 which can't be loaded dynamically, so the IDE prompts to restart

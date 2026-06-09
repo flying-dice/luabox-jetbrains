@@ -34,6 +34,7 @@ C4-style diagrams and docs via the `pds` toolchain.
 | Diagnostics (errors & warnings) | `pds lsp` → `publishDiagnostics` |
 | Hover, Go to definition, Find usages, Rename | `pds lsp` |
 | Formatting | `pds lsp` → `formatting` |
+| Diagrams — each symbol's fitting view: C4 context/container/component, sequence flows, data entity views, feature flow diagrams | `pds svg --symbol` (Structure tree / *Open Diagram*) |
 | **Build / Serve Docs** menu on `pds.toml` | `pds doc` / `pds doc --serve` |
 
 **Highlighting works offline.** The bundled lexer colors a file the moment it

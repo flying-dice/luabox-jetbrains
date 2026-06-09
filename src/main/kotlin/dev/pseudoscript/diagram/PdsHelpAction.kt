@@ -102,7 +102,8 @@ class PdsHelpDialog(project: Project?) : DialogWrapper(project) {
             <br><br>
             <b>This panel</b><br>
             &bull; <b>Structure</b> — your model's symbol tree (from <code>pds outline</code>).
-            Click any node to render its C4 / sequence diagram; export to SVG / PNG.<br>
+            Click any node to render its fitting diagram — C4, sequence, data entity,
+            or feature flow; export to SVG / PNG.<br>
             &bull; <b>Docs</b> — build, serve, and live-preview the documentation site.<br>
             <br>
             Needs the <code>pds</code> binary on your PATH

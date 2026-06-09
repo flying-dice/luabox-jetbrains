@@ -209,9 +209,10 @@ private class PdsStructurePanel(private val project: Project) : JPanel(BorderLay
     /**
      * The tree's right-click menu. Right-clicking first selects the node under the
      * cursor (Swing doesn't do this for us), then offers:
-     * - **Open Diagram** — render the node's C4 view or flow sequence (a context
-     *   overview or any declared symbol). This is deliberately not on left-click,
-     *   so browsing the tree doesn't keep spawning renders.
+     * - **Open Diagram** — render the node's fitting view: a C4 boundary, a
+     *   flow sequence, a data type's entity view, or a feature's flow diagram
+     *   (a context overview or any declared symbol). This is deliberately not on
+     *   left-click, so browsing the tree doesn't keep spawning renders.
      * - **Open Source** — jump to the symbol's declaration in its `.pds` file
      *   (declared symbols only; the context view and headers have no location).
      *

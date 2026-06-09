@@ -111,7 +111,11 @@ object PdsCli {
             is PdsResult.Err -> raw
         }
 
-    /** The fitting diagram for a symbol (C4 sub-view, or a flow's sequence), in `theme`. */
+    /**
+     * The fitting diagram for a symbol, in `theme`: a system/container's C4
+     * sub-view, a triggered callable's sequence, a data type's entity view
+     * (LANG.md §9.4), or a feature's flow diagram (LANG.md §9.5).
+     */
     fun symbolSvg(workspaceDir: String, fqn: String, theme: String): PdsResult<String> =
         run(workspaceDir, "svg", "--symbol", fqn, "--theme", theme)
 
