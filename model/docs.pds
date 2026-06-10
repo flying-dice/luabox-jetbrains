@@ -4,23 +4,45 @@
 /// The Docs tab (live preview) and the Build / Serve Docs actions.
 public container Docs for main::PseudoScriptPlugin;
 
-/// Embedded live preview: runs `pds doc --watch`, loads the served site in a JCEF
-/// browser, and auto-reloads as the model changes.
-public component DocsPanel for Docs {
-  /// Stop any running server, resolve the workspace, and start `pds doc --watch`;
-  /// the panel shows the site once the server announces its URL.
+/// Embedded live preview: runs `pds doc --watch` on a free port, loads the
+/// served site in a JCEF browser, and auto-reloads as the model changes. An IDE
+/// without embedded-browser support falls back to the system browser.
+public component DocsPanel for docs::Docs {
+  /// Resolve which workspace to serve, stop any running server, pick a free
+  /// port, and start `pds doc --watch`; once the server announces its URL the
+  /// site loads embedded — or in the system browser when JCEF is unsupported.
   #[manual]
-  public Serve(workspaceDir: string): void {
+  public Serve(): void {
     self.stopServer()
-    main::Pds.doc(workspaceDir)
+    dir = string from self.resolveWorkspace()
+    port = number from self.freePort()
+    main::Pds.docWatch(dir, port)
+    url = string from self.awaitAnnouncedUrl()
+    embedded = bool from self.jcefSupported()
+    if (!embedded) {
+      main::Intellij.openBrowser(url)
+      return
+    }
+    self.loadEmbedded(url)
   }
 
+  /// The workspace to serve: the active `.pds` file's nearest enclosing
+  /// `pds.toml`, else the first discovered workspace, else the project root.
+  resolveWorkspace(): string;
   /// Kill the running doc server, if any.
   stopServer(): void;
+  /// An ephemeral free port for the local doc server.
+  freePort(): number;
+  /// The local URL the server announces on its output once ready.
+  awaitAnnouncedUrl(): string;
+  /// Whether this IDE ships the embedded (JCEF) browser.
+  jcefSupported(): bool;
+  /// Load the URL in the embedded browser pane.
+  loadEmbedded(url: string): void;
 }
 
 /// The `pds.toml` context-menu actions, run with a console + stop button.
-public component DocActions for Docs {
+public component DocActions for docs::Docs {
   /// Generate the documentation site (`pds doc`).
   #[manual]
   public BuildDocs(workspaceDir: string): void {
@@ -30,14 +52,15 @@ public component DocActions for Docs {
   /// Generate and serve it (`pds doc --serve`).
   #[manual]
   public ServeDocs(workspaceDir: string): void {
-    main::Pds.doc(workspaceDir)
+    main::Pds.docServe(workspaceDir)
   }
 }
 
 /// The site is previewed live, in-IDE, and reloads on edit.
-feature LiveDocsPreview for DocsPanel {
+feature LiveDocsPreview for docs::DocsPanel {
   given "a workspace with a `pds.toml`"
   when "the developer runs Build & Serve Docs"
-  then "`pds doc` serves the site locally"
+  then "`pds doc` serves the site locally on a free port"
   and "it loads in an embedded browser and reloads as files change"
+  and "an IDE without JCEF opens the site in the system browser instead"
 }

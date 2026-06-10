@@ -3,11 +3,11 @@ version = 1
 [[root]]
 name = "pseudoscript"
 source = "git@github.com:flying-dice/pseudoscript"
-rev = "c17e35b2c1a93be10c6509f081b34650240533ef"
+rev = "56aff7eac74e5a9a7f7c8113053bcb7a8e443364"
 path = "model"
 
 [[package]]
 name = "pseudoscript"
 source = "git@github.com:flying-dice/pseudoscript"
-rev = "c17e35b2c1a93be10c6509f081b34650240533ef"
+rev = "56aff7eac74e5a9a7f7c8113053bcb7a8e443364"
 path = "model"

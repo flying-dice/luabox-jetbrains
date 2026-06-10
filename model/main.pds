@@ -6,7 +6,8 @@
 //! This model maps that bridge — the boundaries, the data crossing them, and the
 //! flows worth tracing. The CLI/LSP toolchain itself is modelled in full by the
 //! `pseudoscript` dependency (this repo depends on the language repo's `model/`),
-//! so the bridge points at `pseudoscript::cli::*` rather than re-describing it.
+//! so the bridge delegates to `pseudoscript::cli::Cli`'s published face rather
+//! than re-describing it.
 
 /// A developer authoring `.pds` models in a JetBrains IDE.
 public person Developer;
@@ -16,37 +17,49 @@ public person Developer;
 public system PseudoScriptPlugin;
 
 /// The `pds` toolchain the plugin shells out to — modelled in full by the
-/// `pseudoscript` dependency. `lsp` and `doc` delegate to that upstream model
-/// (`pseudoscript::cli::LspHost` / `DocCmd`); the JSON/SVG query commands the
-/// plugin parses (`outline`/`list`/`svg`) stay signature-only here, since the
-/// upstream model does not expose them as nodes.
+/// `pseudoscript` dependency. `lsp` and `doc` delegate to the upstream container's
+/// published face (`pseudoscript::cli::Cli.runLsp` / `runDoc`); the JSON/SVG query
+/// commands the plugin parses (`outline`/`list`/`svg`) stay signature-only here,
+/// since the upstream face does not publish them.
 ///
 /// Invoked the same way everywhere: the configured binary (PATH name or absolute
 /// path) run with the workspace directory as the working directory, so it finds
-/// `pds.toml` and resolves workspace FQNs.
+/// `pds.toml` and resolves workspace FQNs. The parsed query commands
+/// (`outline`/`list`/`svg`) are capped at `diagrams::TIMEOUT_MS` before the
+/// plugin declares them hung; the server modes (`lsp`, `doc` serving) run until
+/// stopped.
 /// #critical
 public system Pds {
-  /// Start the stdio language server (`pds lsp`) — the upstream `LspHost`.
-  lsp(): void {
-    pseudoscript::cli::LspHost.run()
+  /// Start the stdio language server (`pds lsp`) — the upstream published face.
+  public lsp(): void {
+    pseudoscript::cli::Cli.runLsp()
   }
   /// A workspace's symbol outline as JSON (`pds outline`).
-  outline(workspaceDir: string): Result<PdsOutlineNode[], CliError>;
+  public outline(workspaceDir: string): Result<main::PdsOutlineNode[], main::CliError>;
   /// Every `pds.toml` workspace under a root, one absolute dir per line (`pds list`).
-  list(root: string): Result<string[], CliError>;
-  /// Render a symbol's fitting view, or a whole-workspace view, to SVG (`pds svg`).
-  svg(workspaceDir: string, target: string, theme: string): Result<string, CliError>;
-  /// Build / serve the documentation site (`pds doc`) — the upstream `DocCmd`.
-  doc(workspaceDir: string): void {
-    pseudoscript::cli::DocCmd.run(workspaceDir)
+  public list(root: string): Result<string[], main::CliError>;
+  /// A symbol's fitting view to SVG (`pds svg --symbol`), themed light or dark.
+  public symbolSvg(workspaceDir: string, fqn: string, theme: string): Result<string, main::CliError>;
+  /// A whole-workspace view to SVG (`pds svg --view`), themed light or dark.
+  public viewSvg(workspaceDir: string, view: string, theme: string): Result<string, main::CliError>;
+  /// Generate the documentation site (`pds doc`) — the upstream published face.
+  public doc(workspaceDir: string): void {
+    pseudoscript::cli::Cli.runDoc(workspaceDir)
   }
+  /// Generate and serve the site (`pds doc --serve`) — the same upstream face,
+  /// in serve mode.
+  public docServe(workspaceDir: string): void;
+  /// Serve with live reload on a chosen port (`pds doc --watch --port`) — the
+  /// same upstream face, in watch mode.
+  public docWatch(workspaceDir: string, port: number): void;
 }
 
 /// The LSP4IJ client runtime — a required companion IDE plugin. Owns the LSP
-/// lifecycle and routes `pds lsp` diagnostics / hover / completion to the editor.
+/// lifecycle and routes `pds lsp` diagnostics / hover / completion / semantic
+/// tokens to the editor.
 public system Lsp4ij {
   /// Take the connection provider that launches `pds lsp`.
-  registerServer(): void;
+  public registerServer(): void;
 }
 
 /// The host IDE platform (IntelliJ). Provides the editor, tool windows, file
@@ -54,20 +67,23 @@ public system Lsp4ij {
 /// its services. Everything inside is the platform's, not ours.
 public system Intellij {
   /// Open / focus a file in the main editor area.
-  openEditor(file: string): void;
+  public openEditor(file: string): void;
   /// Refresh every editor-notification banner.
-  refreshNotifications(): void;
+  public refreshNotifications(): void;
+  /// Open a URL in the system browser.
+  public openBrowser(url: string): void;
 }
 
 /// One node of `pds outline` — the structure-tree payload. `kind` is one of
-/// person / system / container / component / data / callable; `triggered` marks a
-/// flow entry point (a callable with a trigger macro).
+/// person / system / container / component / data / callable / feature;
+/// `triggered` marks a flow entry point (a callable with a trigger macro).
 public data PdsOutlineNode { fqn: string, name: string, kind: string, parent: Option<string>, triggered: bool, module: string, line: number, col: number }
 
-/// What a diagram tab currently shows: the workspace to render against, and
-/// either a symbol FQN (its fitting view) or none (the whole-workspace context
-/// view). `title` is the human label for the toolbar.
-public data DiagramTarget { workspaceDir: string, fqn: Option<string>, title: string }
+/// What the (single, reused) diagram tab shows: the workspace to render against
+/// and the symbol whose fitting view is drawn. `title` is the human label for
+/// the tab. The whole-workspace context view is requested separately
+/// (`diagrams::DiagramService.showContext`), so it carries no symbol.
+public data DiagramTarget { workspaceDir: string, fqn: string, title: string }
 
 /// The message side of a failed `pds` invocation (timeout, non-zero exit, or a
 /// JSON parse failure) — surfaced to the UI as status text.

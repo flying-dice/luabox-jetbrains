@@ -1,21 +1,34 @@
 //! Configuration — the `pds` binary path, the one availability check everything
 //! shares, and the banner shown when the binary can't be found.
 
-/// Settings, binary detection, and user-facing setup guidance.
-public container Configuration for main::PseudoScriptPlugin;
+/// Settings, binary detection, and user-facing setup guidance. The availability
+/// check is published here, on the container face, so the LSP launcher and the
+/// banner couple to one facade rather than the engine behind it.
+public container Configuration for main::PseudoScriptPlugin {
+  /// True if the configured `pds` resolves on PATH, or is an executable file.
+  public isAvailable(): bool {
+    return config::BinaryCheck.isAvailable()
+  }
+
+  /// The headline shown when it can't be found, naming the path that was tried.
+  public notFoundMessage(): string {
+    return config::BinaryCheck.notFoundMessage()
+  }
+}
 
 /// Application-wide persistent store of the `pds` binary path. A blank value
 /// falls back to the bare name `pds`, resolved on PATH.
-public component Settings for Configuration {
+public component Settings for config::Configuration {
   /// The configured path (PATH name or absolute).
   pdsPath(): string;
   /// Persist a new path.
   setPdsPath(path: string): void;
 }
 
-/// "Can we reach `pds`?" — the single check the LSP launcher, the banner, and the
-/// diagram CLI wrapper all lean on, so the user gets one consistent answer.
-public component BinaryCheck for Configuration {
+/// "Can we reach `pds`?" — the single check behind the container's published
+/// face, so the LSP launcher, the banner, and the diagram CLI wrapper all get
+/// one consistent answer.
+component BinaryCheck for config::Configuration {
   /// True if the configured `pds` resolves on PATH, or is an executable file.
   isAvailable(): bool;
   /// The headline shown when it can't be found, naming the path that was tried.
@@ -23,33 +36,33 @@ public component BinaryCheck for Configuration {
 }
 
 /// The settings page (Settings > Languages & Frameworks > PseudoScript).
-public component SettingsForm for Configuration {
+public component SettingsForm for config::Configuration {
   /// Save the edited path, then refresh banners so the missing-binary warning
   /// clears (or reappears) without reopening any files.
   #[manual]
   public ApplySettings(path: string): void {
-    Settings.setPdsPath(path)
+    config::Settings.setPdsPath(path)
     main::Intellij.refreshNotifications()
   }
 }
 
 /// Warns atop `.pds` / `pds.toml` files when the binary is missing — highlighting
 /// still works, but diagnostics, diagrams, and docs need it.
-public component MissingBinaryBanner for Configuration {
+public component MissingBinaryBanner for config::Configuration {
   /// A banner message when `pds` is unreachable; nothing when it resolves.
   #[manual]
   public Render(): Option<string> {
-    ok: bool = BinaryCheck.isAvailable()
+    ok = bool from config::BinaryCheck.isAvailable()
     if (ok) {
       return None
     }
-    message: string = BinaryCheck.notFoundMessage()
+    message = string from config::BinaryCheck.notFoundMessage()
     return Some(message)
   }
 }
 
 /// The banner guides setup and disappears once configured.
-feature MissingBinaryBannerShown for Configuration {
+feature MissingBinaryBannerShown for config::Configuration {
   given "the configured `pds` path does not resolve"
   when "a `.pds` or `pds.toml` file is open"
   then "a warning banner offers to open Settings and the install page"

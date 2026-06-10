@@ -2,31 +2,45 @@
 
 ## BinaryCheck
 
-`public component` · `config::BinaryCheck`
+`private component` · `config::BinaryCheck`
 
-"Can we reach `pds`?" — the single check the LSP launcher, the banner, and the
-diagram CLI wrapper all lean on, so the user gets one consistent answer.
+"Can we reach `pds`?" — the single check behind the container's published
+face, so the LSP launcher, the banner, and the diagram CLI wrapper all get
+one consistent answer.
 
 **Relationships**
 
 - _Parent_
   - for [config::Configuration](config.md#config-Configuration)
 - _Inbound_
+  - call [config::Configuration](config.md#config-Configuration) — isAvailable
+  - call [config::Configuration](config.md#config-Configuration) — notFoundMessage
   - call [config::MissingBinaryBanner](config.md#config-MissingBinaryBanner) — isAvailable
   - call [config::MissingBinaryBanner](config.md#config-MissingBinaryBanner) — notFoundMessage
-  - call [lsp::LanguageServer](lsp.md#lsp-LanguageServer) — isAvailable
-  - call [lsp::LanguageServer](lsp.md#lsp-LanguageServer) — notFoundMessage
+- _Outbound_
+  - from `config::bool`
+  - from `config::string`
 
 ## Configuration
 
 `public container` · `config::Configuration`
 
-Settings, binary detection, and user-facing setup guidance.
+Settings, binary detection, and user-facing setup guidance. The availability
+check is published here, on the container face, so the LSP launcher and the
+banner couple to one facade rather than the engine behind it.
 
 **Relationships**
 
 - _Parent_
   - for [main::PseudoScriptPlugin](main.md#main-PseudoScriptPlugin)
+- _Inbound_
+  - call [lsp::LanguageServer](lsp.md#lsp-LanguageServer) — isAvailable
+  - call [lsp::LanguageServer](lsp.md#lsp-LanguageServer) — notFoundMessage
+- _Outbound_
+  - call [config::BinaryCheck](config.md#config-BinaryCheck) — isAvailable
+  - call [config::BinaryCheck](config.md#config-BinaryCheck) — notFoundMessage
+  - from `lsp::bool`
+  - from `lsp::string`
 
 **Scenarios**
 
@@ -35,6 +49,10 @@ Settings, binary detection, and user-facing setup guidance.
   - _when_ a `.pds` or `pds.toml` file is open
   - _then_ a warning banner offers to open Settings and the install page
   - _and_ the banner clears once a valid path is set
+
+**Flow — MissingBinaryBannerShown**
+
+![Flow — MissingBinaryBannerShown](../diagrams/config-Configuration-flow-0.svg)
 
 **Component diagram**
 
