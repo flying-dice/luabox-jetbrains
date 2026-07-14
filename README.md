@@ -126,5 +126,3 @@ deliberate manual step performed by the maintainer with the downloaded release
 artifact.
 
 ---
-
-*Forked from [flying-dice/pseudoscript-jetbrains](https://github.com/flying-dice/pseudoscript-jetbrains).*
