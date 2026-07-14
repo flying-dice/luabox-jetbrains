@@ -40,6 +40,17 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.1</b> — <b>Sign in with GitHub</b> from the luabox Packages
+                tool window. A new auth bar runs the CLI's device-flow
+                <code>luabox login</code>: it shows your one-time code, opens
+                github.com/login/device in your browser, and completes hands-free —
+                the CLI stores the token in your OS keychain, so searching and
+                version resolution then authenticate automatically with no token
+                configured. Adds a <b>Sign out</b> action (<code>luabox logout</code>)
+                and a <code>luabox.signInGithub</code> action. Rate-limit hints now
+                point at sign-in. The <b>GitHub token</b> setting remains as an
+                optional PAT override (restricted orgs / GHE). Sign-in requires the
+                <code>luabox</code> CLI ≥ 0.1.4.</li>
             <li><b>0.2.0</b> — New <b>luabox Packages</b> tool window: an npm-like
                 dependency manager backed by the <code>luabox</code> CLI. Discover
                 packages on GitHub, one-click <b>Install</b> as a dependency, and
@@ -125,6 +136,19 @@
         <!-- Balloon notifications for package-management outcomes and errors. -->
         <notificationGroup id="luabox" displayType="BALLOON"/>
     </extensions>
+
+    <actions>
+        <!--
+          Start the GitHub device-flow sign-in (luabox login) from anywhere: it
+          activates the luabox Packages tool window and kicks off the same flow as
+          the auth bar's "Sign in with GitHub" button.
+        -->
+        <action
+            id="luabox.signInGithub"
+            class="com.luabox.packages.LuaboxSignInAction"
+            text="Sign in with GitHub (luabox)"
+            description="Sign in to GitHub for luabox package management using the device flow."/>
+    </actions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
         <server

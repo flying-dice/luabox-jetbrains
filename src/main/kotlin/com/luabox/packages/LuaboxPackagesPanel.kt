@@ -8,6 +8,8 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -16,6 +18,7 @@ import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.notification.Notification
 import com.intellij.ui.JBColor
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
@@ -27,6 +30,7 @@ import com.luabox.settings.LuaboxBinary
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.FlowLayout
+import java.awt.datatransfer.StringSelection
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -54,6 +58,15 @@ class LuaboxPackagesPanel(private val project: Project) :
     private val searchField = SearchTextField()
     private val outdatedLabel = JBLabel()
     private var lastQuery = ""
+
+    // --- auth bar / sign-in state -----------------------------------------
+    private val authStatusLabel = JBLabel()
+    private val authButtonPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 4, 0)).apply { isOpaque = false }
+    private val authBar = JPanel(BorderLayout())
+    /** The running device-flow login, if any (so Cancel/dispose can destroy it). */
+    private var loginSession: LuaboxLoginSession? = null
+    /** The sticky prompt notification, held so we can expire it on completion. */
+    private var promptNotification: Notification? = null
 
     init {
         toolbar = buildToolbar()
@@ -86,11 +99,27 @@ class LuaboxPackagesPanel(private val project: Project) :
             .createActionToolbar("LuaboxPackages", group, true)
         actionToolbar.targetComponent = this
 
-        val bar = JPanel(BorderLayout())
-        bar.add(actionToolbar.component, BorderLayout.WEST)
+        val actionRow = JPanel(BorderLayout())
+        actionRow.add(actionToolbar.component, BorderLayout.WEST)
         outdatedLabel.border = JBUI.Borders.emptyRight(10)
-        bar.add(outdatedLabel, BorderLayout.EAST)
-        return bar
+        actionRow.add(outdatedLabel, BorderLayout.EAST)
+
+        // Stack the action row above the GitHub auth bar.
+        val stack = JPanel(BorderLayout())
+        stack.add(actionRow, BorderLayout.NORTH)
+        stack.add(buildAuthBar(), BorderLayout.SOUTH)
+        return stack
+    }
+
+    private fun buildAuthBar(): JComponent {
+        authBar.border = JBUI.Borders.compound(
+            JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0),
+            JBUI.Borders.empty(4, 8),
+        )
+        authStatusLabel.border = JBUI.Borders.emptyRight(8)
+        authBar.add(authStatusLabel, BorderLayout.CENTER)
+        authBar.add(authButtonPanel, BorderLayout.EAST)
+        return authBar
     }
 
     private fun buildBody(): JComponent {
@@ -125,6 +154,7 @@ class LuaboxPackagesPanel(private val project: Project) :
     // --- refresh -----------------------------------------------------------
 
     fun refreshAll() {
+        refreshAuth()
         doSearch(lastQuery)
         refreshInstalled()
     }
@@ -156,6 +186,155 @@ class LuaboxPackagesPanel(private val project: Project) :
         runBg("Loading luabox dependencies", { LuaboxCli.outdated(project) }) { deps ->
             renderInstalled(deps)
         }
+    }
+
+    // --- GitHub auth -------------------------------------------------------
+
+    /**
+     * Re-query `luabox whoami` off the EDT and repaint the auth bar. Failures
+     * (older CLI without the subcommand, or a not-signed-in non-zero exit) are
+     * treated as "not signed in" — no error notification.
+     */
+    fun refreshAuth() {
+        if (!LuaboxBinary.isAvailable()) {
+            renderAuthSignedOut()
+            return
+        }
+        authStatusLabel.text = "Checking sign-in…"
+        authStatusLabel.foreground = JBColor.GRAY
+        authButtonPanel.removeAll()
+        revalidateRepaint(authBar)
+
+        val result = arrayOfNulls<WhoAmI>(1)
+        object : Task.Backgroundable(project, "Checking luabox GitHub sign-in", true) {
+            override fun run(indicator: ProgressIndicator) {
+                result[0] = try {
+                    LuaboxCli.whoami(project)
+                } catch (e: LuaboxCliException) {
+                    null
+                }
+            }
+
+            override fun onSuccess() {
+                val who = result[0]
+                if (who != null && who.signedIn) renderAuthSignedIn(who) else renderAuthSignedOut()
+            }
+        }.queue()
+    }
+
+    private fun renderAuthSignedIn(who: WhoAmI) {
+        val login = who.login ?: return renderAuthSignedOut()
+        authButtonPanel.removeAll()
+        authStatusLabel.foreground = SIGNED_IN_COLOR
+        if (who.viaTokenOverride) {
+            // Authenticating via the LUABOX_GITHUB_TOKEN PAT override, not the
+            // keychain — `luabox logout` wouldn't change this, so offer settings.
+            authStatusLabel.text = "✓ Signed in as $login (token override)"
+            authButtonPanel.add(
+                JButton("Manage token…").apply {
+                    toolTipText = "This session uses the GitHub token override in Settings"
+                    addActionListener { LuaboxBinary.openSettings(project) }
+                },
+            )
+        } else {
+            authStatusLabel.text = "✓ Signed in as $login"
+            authButtonPanel.add(
+                JButton("Sign out").apply {
+                    toolTipText = "Run luabox logout (clears the CLI's stored GitHub token)"
+                    addActionListener { signOut() }
+                },
+            )
+        }
+        revalidateRepaint(authBar)
+    }
+
+    private fun renderAuthSignedOut() {
+        authButtonPanel.removeAll()
+        authStatusLabel.text = "Not signed in"
+        authStatusLabel.foreground = JBColor.GRAY
+        authButtonPanel.add(
+            JButton("Sign in with GitHub").apply {
+                toolTipText = "Sign in to GitHub with the device flow (opens your browser)"
+                addActionListener { signIn() }
+            },
+        )
+        revalidateRepaint(authBar)
+    }
+
+    /** Start the GitHub device-flow sign-in. Reentry cancels any in-flight login. */
+    fun signIn() {
+        if (!LuaboxBinary.isAvailable()) {
+            LuaboxNotifications.error(
+                project,
+                LuaboxCliException(LuaboxBinary.notFoundMessage(), binaryMissing = true),
+            )
+            return
+        }
+        loginSession?.cancel()
+        dismissPrompt()
+        authStatusLabel.text = "Starting GitHub sign-in…"
+        authStatusLabel.foreground = JBColor.GRAY
+        authButtonPanel.removeAll()
+        revalidateRepaint(authBar)
+
+        val session = LuaboxLoginSession(
+            project,
+            object : LoginListener {
+                override fun onPrompt(prompt: LoginPrompt) = showLoginPrompt(prompt)
+
+                override fun onSuccess(login: String) {
+                    dismissPrompt()
+                    LuaboxNotifications.info(project, "Signed in to GitHub as $login.")
+                    // Re-auth, and re-run search/installed now that calls authenticate.
+                    refreshAll()
+                }
+
+                override fun onError(message: String, cliTooOld: Boolean) {
+                    dismissPrompt()
+                    if (cliTooOld) LuaboxNotifications.cliTooOldForLogin(project)
+                    else LuaboxNotifications.error(project, LuaboxCliException(message))
+                    refreshAuth()
+                }
+            },
+        )
+        loginSession = session
+        // Spawning the child process can block; keep it off the EDT.
+        ApplicationManager.getApplication().executeOnPooledThread { session.start() }
+    }
+
+    private fun showLoginPrompt(prompt: LoginPrompt) {
+        dismissPrompt()
+        authStatusLabel.text = "Waiting for GitHub authorization…"
+        authStatusLabel.foreground = JBColor.GRAY
+        val target = prompt.verificationUriComplete ?: prompt.verificationUri
+        val minutes = (prompt.expiresIn / 60).coerceAtLeast(1)
+        promptNotification = LuaboxNotifications.loginPrompt(
+            project = project,
+            userCode = prompt.userCode,
+            verificationUri = prompt.verificationUri,
+            expiresInMinutes = minutes,
+            onCopyAndOpen = {
+                CopyPasteManager.getInstance().setContents(StringSelection(prompt.userCode))
+                BrowserUtil.browse(target)
+            },
+            onCancel = {
+                loginSession?.cancel()
+                dismissPrompt()
+                refreshAuth()
+            },
+        )
+    }
+
+    private fun signOut() {
+        runBg("Signing out of GitHub", { LuaboxCli.logout(project) }) {
+            LuaboxNotifications.info(project, "Signed out of GitHub.")
+            refreshAll()
+        }
+    }
+
+    private fun dismissPrompt() {
+        promptNotification?.expire()
+        promptNotification = null
     }
 
     // --- rendering ---------------------------------------------------------
@@ -384,9 +563,13 @@ class LuaboxPackagesPanel(private val project: Project) :
         component.repaint()
     }
 
-    override fun dispose() {}
+    override fun dispose() {
+        loginSession?.cancel()
+        dismissPrompt()
+    }
 
     private companion object {
         val OUTDATED_COLOR = JBColor(0xB58900, 0xD9A441)
+        val SIGNED_IN_COLOR = JBColor(0x3C8E4A, 0x57A64A)
     }
 }

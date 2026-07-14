@@ -40,11 +40,14 @@ class LuaboxConfigurable : Configurable {
                 ),
                 1,
             )
-            .addLabeledComponent(JBLabel("GitHub token (optional):"), token, 1, false)
+            .addLabeledComponent(JBLabel("GitHub token override (optional):"), token, 1, false)
             .addComponentToRightColumn(
                 JBLabel(
-                    "Passed to luabox as LUABOX_GITHUB_TOKEN when searching and " +
-                        "resolving package versions, for higher GitHub rate limits.",
+                    "<html>The normal way to authenticate is <b>Sign in with GitHub</b> in the " +
+                        "luabox Packages tool window (device flow; the token is stored in your " +
+                        "OS keychain). This field is an <b>override</b> for restricted orgs or " +
+                        "GHE: when set it is passed as LUABOX_GITHUB_TOKEN and takes precedence " +
+                        "over the keychain sign-in.</html>",
                 ),
                 1,
             )

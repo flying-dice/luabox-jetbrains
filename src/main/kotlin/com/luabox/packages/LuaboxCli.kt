@@ -36,6 +36,18 @@ data class Dependency(
 }
 
 /**
+ * GitHub auth state from `luabox whoami --format json`:
+ * `{"login":"<user>|null","source":"keychain|env|null"}`. [login] null means not
+ * signed in; [source] tells us how the CLI is authenticating — `keychain` (the
+ * device-flow login the plugin drives), `env` (a `LUABOX_GITHUB_TOKEN` PAT
+ * override), or null.
+ */
+data class WhoAmI(val login: String?, val source: String?) {
+    val signedIn: Boolean get() = login != null
+    val viaTokenOverride: Boolean get() = source == "env"
+}
+
+/**
  * Failure from a `luabox` invocation, carrying enough context for the UI to pick
  * the right message: a rate-limit hint (offer the token setting) or a
  * binary-missing hint (offer settings + install link).
@@ -119,6 +131,22 @@ object LuaboxCli {
     /** `luabox update <name>` — re-pins to the latest tag. */
     fun update(project: Project, name: String) {
         run(project, listOf("update", name))
+    }
+
+    /**
+     * `luabox whoami --format json` — who the CLI is authenticated as, and how.
+     * On older CLIs without the subcommand (or when not signed in and the CLI
+     * exits non-zero) this throws [LuaboxCliException]; the caller treats that as
+     * "not signed in" rather than surfacing an error.
+     */
+    fun whoami(project: Project): WhoAmI {
+        val json = runJson(project, listOf("whoami", "--format", "json"))
+        return WhoAmI(login = json.str("login"), source = json.str("source"))
+    }
+
+    /** `luabox logout` — clears the CLI keychain. Idempotent. */
+    fun logout(project: Project) {
+        run(project, listOf("logout"))
     }
 
     // --- internals ---------------------------------------------------------

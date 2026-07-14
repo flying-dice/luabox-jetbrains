@@ -20,9 +20,11 @@ class LuaboxSettings :
         var luaboxPath: String? by string(DEFAULT_PATH)
 
         /**
-         * Optional GitHub token, passed to the `luabox` CLI as
-         * `LUABOX_GITHUB_TOKEN` for higher GitHub API rate limits when searching
-         * and resolving package versions. Blank means "don't pass one".
+         * Optional GitHub token OVERRIDE, passed to the `luabox` CLI as
+         * `LUABOX_GITHUB_TOKEN`. The normal auth path is device-flow sign-in
+         * (`luabox login`), whose token the CLI stores in the OS keychain; this
+         * field is an override for restricted orgs / GHE and takes precedence over
+         * the keychain when set. Blank means "don't pass one".
          */
         var githubToken: String? by string("")
     }
