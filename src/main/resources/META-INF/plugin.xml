@@ -6,86 +6,46 @@
   installed but inert until the next restart.
 -->
 <idea-plugin require-restart="true">
-    <id>dev.pseudoscript.pds</id>
-    <name>PseudoScript</name>
-    <vendor email="hello@pseudoscript.dev" url="https://pseudoscript.dev">PseudoScript</vendor>
+    <id>com.luabox</id>
+    <name>luabox</name>
+    <vendor email="hello@flying-dice.com" url="https://github.com/flying-dice/luabox">flying-dice</vendor>
 
     <description><![CDATA[
-        <p>Language support for <b>PseudoScript</b> (<code>.pds</code>) — a
-        <b>pseudoprogramming</b> language: you code the abstraction and let it
-        autogenerate, rather than hand-maintaining the output. It reads like
-        pseudocode, expresses C4-style structure (system / container /
-        component / person), and compiles to SVG diagrams.</p>
+        <p>Lua language support for JetBrains IDEs, powered by the
+        <b>luabox</b> toolchain's language server (<code>luabox lsp</code>) —
+        a unified Lua typechecker, linter, formatter, and package manager.</p>
 
         <h3>Features</h3>
         <ul>
-            <li><b>Syntax highlighting</b>, comment toggling, and a color-scheme
-                page (bundled, no server needed).</li>
-            <li><b>Diagnostics, hover, formatting, and go-to-definition</b> via
-                the <code>pds lsp</code> language server.</li>
-            <li><b>Diagrams</b> — click a node in the PseudoScript tool window's
-                Structure tab (or <i>PseudoScript &gt; Open Diagram</i> in the
-                editor) to render its fitting view: C4 context / container /
-                component, a triggered flow's sequence, a data type's entity
-                view, or a feature's flow diagram (<code>pds svg</code>), with
-                SVG / PNG export.</li>
-            <li><b>Build / Serve Docs</b> — right-click a <code>pds.toml</code>
-                to generate the documentation site (<code>pds doc</code>) or
-                serve it locally (<code>pds doc --serve</code>).</li>
+            <li><b>Base syntax highlighting</b> for <code>.lua</code> files
+                (keywords, strings, numbers, comments) — bundled, works with no
+                binary installed.</li>
+            <li><b>Diagnostics with quick-fixes, hover, completion, go-to-definition,
+                document symbols, formatting, and semantic highlighting</b> via
+                the <code>luabox lsp</code> language server.</li>
         </ul>
 
         <h3>Requirements</h3>
         <ul>
             <li>The <a href="https://plugins.jetbrains.com/plugin/23257-lsp4ij">LSP4IJ</a>
                 plugin (installed automatically as a dependency).</li>
-            <li>The <code>pds</code> binary on your <code>PATH</code>, or its
-                location set in
-                <i>Settings &gt; Languages &amp; Frameworks &gt; PseudoScript</i>.</li>
+            <li>The <code>luabox</code> binary on your <code>PATH</code> or in
+                <code>~/.luabox/bin</code>, or its location set in
+                <i>Settings &gt; Languages &amp; Frameworks &gt; luabox</i>.
+                Get it from
+                <a href="https://github.com/flying-dice/luabox/releases">the luabox releases</a>.</li>
         </ul>
+
+        <p><i>Forked from
+        <a href="https://github.com/flying-dice/pseudoscript-jetbrains">flying-dice/pseudoscript-jetbrains</a>.</i></p>
     ]]></description>
 
     <change-notes><![CDATA[
         <ul>
-            <li><b>0.7.0</b> — Caught up with the latest PseudoScript language
-                and toolchain:
-                <ul>
-                    <li>Highlighting for the new <b>operators</b>
-                        (<code>+ - * / % == != &lt;= &gt;= &amp;&amp; ||</code>)
-                        and <b><code>constant</code></b> declarations; the removed
-                        <code>alias</code> keyword no longer highlights.</li>
-                    <li>The Structure tree renders each symbol's fitting diagram,
-                        now including <b>data entity views</b> and <b>feature flow
-                        diagrams</b>; feature entries get a proper icon and sort
-                        order.</li>
-                </ul></li>
-            <li><b>0.6.0</b> — The plugin now requires an IDE restart on
-                install / update. It registers a file type and an LSP server,
-                which can't be loaded dynamically, so the IDE prompts to restart
-                instead of silently installing without effect.</li>
-            <li><b>0.5.0</b> — Modernised deprecated platform APIs; the minimum
-                supported IDE is now <b>2025.1</b>.</li>
-            <li><b>0.4.0</b> — A <b>search box</b> in the PseudoScript tool window's
-                Structure tab: filter the workspace symbol tree live by name, FQN,
-                or kind, keeping the path to every match.</li>
-            <li><b>0.3.0</b> — A <b>Help</b> button (top-right of the PseudoScript
-                tool window) with a quick intro to PseudoProgramming and a
-                paste-ready prompt that has any coding agent install the
-                PseudoScript skill (<code>pds skill</code>) and write your model.
-                Plus an editor banner warning when the <code>pds</code> binary is
-                missing.</li>
-            <li><b>0.2.0</b> — A visual <b>PseudoScript</b> tool window:
-                <ul>
-                    <li><b>Structure</b> — the workspace symbol tree (monorepo-aware);
-                        click a node, or <i>PseudoScript &gt; Open Diagram</i> in the
-                        editor, to render its C4 view or flow sequence as a zoomable,
-                        pannable diagram with SVG / PNG export.</li>
-                    <li><b>Docs</b> — build &amp; serve the documentation site and
-                        preview it live (auto-reloading) in an embedded browser.</li>
-                </ul>
-                Diagrams follow the IDE's light / dark theme.</li>
-            <li><b>0.1.0</b> — Initial release: syntax highlighting, LSP-backed
-                diagnostics / hover / formatting / go-to-definition, and a
-                Build / Serve Docs context menu on <code>pds.toml</code>.</li>
+            <li><b>0.1.0</b> — Initial release: <code>.lua</code> file type with
+                bundled base syntax highlighting, and LSP-backed diagnostics,
+                hover, completion, go-to-definition, document symbols, formatting,
+                and semantic highlighting via <code>luabox lsp</code>.</li>
         </ul>
     ]]></change-notes>
 
@@ -95,142 +55,71 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType
-            name="PseudoScript"
-            implementationClass="dev.pseudoscript.lang.PseudoScriptFileType"
+            name="Lua (luabox)"
+            implementationClass="com.luabox.lang.LuaFileType"
             fieldName="INSTANCE"
-            language="PseudoScript"
-            extensions="pds"/>
+            language="luabox"
+            extensions="lua"/>
 
         <lang.syntaxHighlighterFactory
-            language="PseudoScript"
-            implementationClass="dev.pseudoscript.highlight.PseudoScriptSyntaxHighlighterFactory"/>
+            language="luabox"
+            implementationClass="com.luabox.highlight.LuaSyntaxHighlighterFactory"/>
 
         <!--
-          Give .pds files LSP4IJ's semantic-token-based PSI: one element per
-          token with a navigation reference. This scopes Cmd-hover/Cmd-click to
-          the symbol under the caret (instead of the whole file) and keeps the
-          semantic-token colouring on LSP4IJ's intended path. Requires LSP4IJ ≥
-          the version that ships this view provider.
+          Give .lua files LSP4IJ's semantic-token-based PSI: one element per
+          token with a navigation reference. This scopes hover/click to the
+          symbol under the caret (instead of the whole file) and keeps the
+          semantic-token colouring on LSP4IJ's intended path.
         -->
         <lang.fileViewProviderFactory
-            language="PseudoScript"
+            language="luabox"
             implementationClass="com.redhat.devtools.lsp4ij.features.semanticTokens.viewProvider.LSPSemanticTokensStructurelessFileViewProviderFactory"/>
 
         <!--
-          Native Structure view (⌘7) for .pds files. LSP4IJ's structure-view support
-          is language-scoped: its generic builder delegates to the
-          lang.psiStructureViewFactory registered for the file's Language, and LSP4IJ
-          only self-registers for TEXT / textmate. Point PseudoScript at the same
-          factory so the LSP `documentSymbol` outline (served by `pds lsp`) populates
-          the Structure tool window.
+          Native Structure view (Alt-7) for .lua files, populated from the LSP
+          `documentSymbol` outline served by `luabox lsp`. LSP4IJ's generic
+          builder delegates to the psiStructureViewFactory registered for the
+          file's Language, so point luabox at LSP4IJ's document-symbol factory.
         -->
         <lang.psiStructureViewFactory
-            language="PseudoScript"
+            language="luabox"
             implementationClass="com.redhat.devtools.lsp4ij.features.documentSymbol.LSPDocumentSymbolStructureViewFactory"/>
 
         <lang.commenter
-            language="PseudoScript"
-            implementationClass="dev.pseudoscript.lang.PseudoScriptCommenter"/>
-
-        <lang.braceMatcher
-            language="PseudoScript"
-            implementationClass="dev.pseudoscript.lang.PseudoScriptBraceMatcher"/>
-
-        <colorSettingsPage
-            implementation="dev.pseudoscript.highlight.PseudoScriptColorSettingsPage"/>
+            language="luabox"
+            implementationClass="com.luabox.lang.LuaCommenter"/>
 
         <applicationService
-            serviceImplementation="dev.pseudoscript.settings.PseudoScriptSettings"/>
+            serviceImplementation="com.luabox.settings.LuaboxSettings"/>
 
         <applicationConfigurable
             parentId="language"
-            instance="dev.pseudoscript.settings.PseudoScriptConfigurable"
-            id="dev.pseudoscript.settings.PseudoScriptConfigurable"
-            displayName="PseudoScript"/>
+            instance="com.luabox.settings.LuaboxConfigurable"
+            id="com.luabox.settings.LuaboxConfigurable"
+            displayName="luabox"/>
 
         <!--
-          The diagram editor: opens a synthetic DiagramVirtualFile (produced by
-          the structure tool window) into a zoomable SVG canvas rendered from
-          `pds svg`. HIDE_DEFAULT_EDITOR keeps the text editor off it.
-        -->
-        <fileEditorProvider
-            implementation="dev.pseudoscript.diagram.DiagramFileEditorProvider"/>
-
-        <!--
-          The structure tool window: the workspace's symbol tree (from
-          `pds outline`); selecting a node renders its diagram in the editor area.
-        -->
-        <toolWindow
-            id="PseudoScript"
-            anchor="right"
-            icon="dev.pseudoscript.lang.PseudoScriptIcons.GREY"
-            factoryClass="dev.pseudoscript.diagram.PdsStructureToolWindowFactory"/>
-
-        <!-- Balloon shown after a diagram is exported to disk. -->
-        <notificationGroup
-            id="PseudoScript"
-            displayType="BALLOON"/>
-
-        <!--
-          Warns atop `.pds` / `pds.toml` files when the `pds` binary is missing:
-          highlighting works, but diagnostics / diagrams / docs need it. Clears
-          once a valid path is configured.
+          Warns atop `.lua` files when the `luabox` binary is missing: base
+          highlighting works, but diagnostics / hover / completion / formatting
+          need it. Clears once a valid path is configured.
         -->
         <editorNotificationProvider
-            implementation="dev.pseudoscript.notification.PdsMissingBinaryEditorNotificationProvider"/>
+            implementation="com.luabox.notification.LuaboxMissingBinaryEditorNotificationProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">
         <server
-            id="pseudoscript"
-            name="PseudoScript Language Server"
-            factoryClass="dev.pseudoscript.lsp.PseudoScriptLanguageServerFactory">
+            id="luabox"
+            name="luabox Language Server"
+            factoryClass="com.luabox.lsp.LuaboxLanguageServerFactory">
             <description><![CDATA[
-                The <code>pds lsp</code> stdio language server.
+                The <code>luabox lsp</code> stdio language server.
             ]]></description>
         </server>
 
         <languageMapping
-            language="PseudoScript"
-            serverId="pseudoscript"
-            languageId="pseudoscript"/>
-
-        <!-- Route `pds lsp` semantic tokens to the plugin's PseudoScript colours. -->
-        <semanticTokensColorsProvider
-            serverId="pseudoscript"
-            class="dev.pseudoscript.lsp.PseudoScriptSemanticTokensColorsProvider"/>
+            language="luabox"
+            serverId="luabox"
+            languageId="lua"/>
     </extensions>
-
-    <actions>
-        <group
-            id="dev.pseudoscript.PdsTomlActions"
-            class="dev.pseudoscript.actions.PdsTomlActionGroup"
-            text="PseudoScript"
-            popup="true"
-            icon="dev.pseudoscript.lang.PseudoScriptIcons.GREY">
-            <!-- Shown on a `.pds` source file. -->
-            <action
-                id="dev.pseudoscript.OpenDiagram"
-                class="dev.pseudoscript.diagram.OpenDiagramAction"
-                text="Open Diagram"
-                description="Render this symbol's PseudoScript diagram"
-                icon="dev.pseudoscript.lang.PseudoScriptIcons.GREY"/>
-            <!-- Shown on a `pds.toml` project root. -->
-            <action
-                id="dev.pseudoscript.BuildDocs"
-                class="dev.pseudoscript.actions.BuildDocsAction"
-                text="Build Docs"
-                description="Generate the documentation site (pds doc)."
-                icon="AllIcons.Actions.Compile"/>
-            <action
-                id="dev.pseudoscript.ServeDocs"
-                class="dev.pseudoscript.actions.ServeDocsAction"
-                text="Serve Docs"
-                description="Generate and serve the documentation site (pds doc --serve)."
-                icon="AllIcons.Actions.Execute"/>
-            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
-            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
-        </group>
-    </actions>
 </idea-plugin>
