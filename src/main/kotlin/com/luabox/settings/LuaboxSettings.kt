@@ -18,12 +18,25 @@ class LuaboxSettings :
          * path is used verbatim.
          */
         var luaboxPath: String? by string(DEFAULT_PATH)
+
+        /**
+         * Optional GitHub token, passed to the `luabox` CLI as
+         * `LUABOX_GITHUB_TOKEN` for higher GitHub API rate limits when searching
+         * and resolving package versions. Blank means "don't pass one".
+         */
+        var githubToken: String? by string("")
     }
 
     var luaboxPath: String
         get() = state.luaboxPath?.takeIf { it.isNotBlank() } ?: DEFAULT_PATH
         set(value) {
             state.luaboxPath = value
+        }
+
+    var githubToken: String
+        get() = state.githubToken?.trim().orEmpty()
+        set(value) {
+            state.githubToken = value.trim()
         }
 
     companion object {

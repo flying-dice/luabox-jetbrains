@@ -26,6 +26,7 @@ formatting, and semantic highlighting — all in your JetBrains IDE.
 | Diagnostics with quick-fixes | `luabox lsp` → `publishDiagnostics` |
 | Hover, completion, go-to-definition, document symbols | `luabox lsp` |
 | Formatting | `luabox lsp` → `formatting` |
+| Dependency management — discover, install, outdated/update/remove | `luabox` CLI (`search`, `outdated`, `add`, `remove`, `update`) |
 
 **Base highlighting works offline.** The bundled lexer colors a `.lua` file the
 moment it opens — even before (or without) the language server. When
@@ -65,11 +66,43 @@ Open any `.lua` file — base highlighting is immediate; the language server
 starts on first open when `luabox` is available. Inspect its traffic in
 **View → Tool Windows → Language Servers** (added by LSP4IJ).
 
+## Dependency management
+
+The **luabox Packages** tool window (right-anchored — **View → Tool Windows →
+luabox Packages**) is an npm-like GUI over the luabox CLI's GitHub-as-registry
+commands. It shells out to the same `luabox` binary the language server uses, in
+your project's base directory, and renders the JSON it prints.
+
+- **Discover.** Type a query and press Enter to run `luabox search`. Each result
+  is a card — package name, `owner/repo`, ★ stars, description, and latest tag —
+  with an **Install** button that runs `luabox add <name> --git <url> --tag
+  <latest>` to add it as a dependency.
+- **Installed.** Every dependency from `luabox outdated` is listed with its
+  current pin. Git deps that have a newer tag show an **outdated: current →
+  latest** indicator and an **Update** button (`luabox update <name>`, re-pins to
+  the latest tag); **Remove** runs `luabox remove <name>`. Non-git deps
+  (path/workspace/registry) are read-only. The toolbar has **Refresh** and an
+  outdated-count label.
+- The Installed view refreshes automatically after any install/update/remove and
+  whenever `luabox.toml` changes on disk.
+
+Edge states are handled: no `luabox.toml` → a "run `luabox new`" hint; the
+`luabox` binary not found → a configure/install prompt; a GitHub rate-limit (403)
+→ a notification linking to the token setting.
+
+**Requires the `luabox` CLI ≥ 0.1.3** (the version that ships the `search`,
+`outdated`, `add`, `remove`, and `update` commands with `--format json`).
+
 ## Configuration
 
-**Settings → Languages & Frameworks → luabox** — the path to the `luabox`
-binary. A bare name (default `luabox`) is resolved on `PATH`, then in
-`~/.luabox/bin`. The server is launched as `<path> lsp`.
+**Settings → Languages & Frameworks → luabox**:
+
+- **Path to the luabox binary** — a bare name (default `luabox`) is resolved on
+  `PATH`, then in `~/.luabox/bin`. The server is launched as `<path> lsp`, and
+  the package-management commands run the same binary.
+- **GitHub token** (optional) — passed to the CLI as `LUABOX_GITHUB_TOKEN` when
+  searching and resolving package versions, for higher GitHub API rate limits.
+  Set one if Discover reports a rate limit.
 
 ---
 
@@ -94,7 +127,8 @@ src/main/kotlin/com/luabox/
   lang/          Lua Language, file type, icon, commenter
   highlight/     base-highlighting lexer + syntax highlighter + factory
   lsp/           LSP4IJ factory + luabox-lsp launcher
-  settings/      luabox binary path (persisted), resolution + settings UI
+  packages/      package-management tool window + luabox-CLI runner
+  settings/      luabox binary path + GitHub token (persisted), resolution + settings UI
   notification/  missing-binary editor banner
 src/main/resources/META-INF/plugin.xml
 ```

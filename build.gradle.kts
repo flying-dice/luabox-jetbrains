@@ -45,7 +45,8 @@ intellijPlatform {
             "Lua support for JetBrains IDEs via the luabox language server " +
             "(diagnostics, hover, completion, go-to-definition, document symbols, " +
             "formatting, semantic highlighting) plus a bundled .lua base-highlighting " +
-            "layer."
+            "layer and an npm-like package-management tool window (discover, install, " +
+            "outdated/update/remove) backed by the luabox CLI."
 
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")

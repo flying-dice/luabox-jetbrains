@@ -40,6 +40,13 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.2.0</b> — New <b>luabox Packages</b> tool window: an npm-like
+                dependency manager backed by the <code>luabox</code> CLI. Discover
+                packages on GitHub, one-click <b>Install</b> as a dependency, and
+                manage installed deps with outdated indicators plus <b>Update</b>
+                and <b>Remove</b>. Adds an optional GitHub-token setting (passed to
+                the CLI as <code>LUABOX_GITHUB_TOKEN</code> for higher rate limits).
+                Requires the <code>luabox</code> CLI ≥ 0.1.3.</li>
             <li><b>0.1.0</b> — Initial release: <code>.lua</code> file type with
                 bundled base syntax highlighting, and LSP-backed diagnostics,
                 hover, completion, go-to-definition, document symbols, formatting,
@@ -103,6 +110,20 @@
         -->
         <editorNotificationProvider
             implementation="com.luabox.notification.LuaboxMissingBinaryEditorNotificationProvider"/>
+
+        <!--
+          The npm-like package-management UI: discover luabox packages on GitHub,
+          Install as dependencies, and manage installed deps (outdated indicators,
+          Update, Remove) — all via the `luabox` CLI. Right-anchored.
+        -->
+        <toolWindow
+            id="luabox Packages"
+            anchor="right"
+            icon="/icons/luabox.svg"
+            factoryClass="com.luabox.packages.LuaboxPackagesToolWindowFactory"/>
+
+        <!-- Balloon notifications for package-management outcomes and errors. -->
+        <notificationGroup id="luabox" displayType="BALLOON"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">

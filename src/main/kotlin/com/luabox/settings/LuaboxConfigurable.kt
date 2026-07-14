@@ -5,6 +5,7 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.ui.EditorNotifications
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBPasswordField
 import com.intellij.util.ui.FormBuilder
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -13,6 +14,7 @@ import javax.swing.JPanel
 class LuaboxConfigurable : Configurable {
     private val settings = LuaboxSettings.getInstance()
     private var pathField: TextFieldWithBrowseButton? = null
+    private var tokenField: JBPasswordField? = null
     private var panel: JPanel? = null
 
     override fun getDisplayName(): String = "luabox"
@@ -27,6 +29,8 @@ class LuaboxConfigurable : Configurable {
             )
         }
         pathField = field
+        val token = JBPasswordField().apply { text = settings.githubToken }
+        tokenField = token
         panel = FormBuilder.createFormBuilder()
             .addLabeledComponent(JBLabel("Path to the luabox binary:"), field, 1, false)
             .addComponentToRightColumn(
@@ -36,15 +40,25 @@ class LuaboxConfigurable : Configurable {
                 ),
                 1,
             )
+            .addLabeledComponent(JBLabel("GitHub token (optional):"), token, 1, false)
+            .addComponentToRightColumn(
+                JBLabel(
+                    "Passed to luabox as LUABOX_GITHUB_TOKEN when searching and " +
+                        "resolving package versions, for higher GitHub rate limits.",
+                ),
+                1,
+            )
             .addComponentFillVertically(JPanel(), 0)
             .panel
         return panel!!
     }
 
-    override fun isModified(): Boolean = effectivePath() != settings.luaboxPath
+    override fun isModified(): Boolean =
+        effectivePath() != settings.luaboxPath || effectiveToken() != settings.githubToken
 
     override fun apply() {
         settings.luaboxPath = effectivePath()
+        settings.githubToken = effectiveToken()
         // The missing-binary banner is keyed on the configured path; refresh open
         // editors so it clears (or reappears) without reopening files.
         EditorNotifications.updateAll()
@@ -52,7 +66,11 @@ class LuaboxConfigurable : Configurable {
 
     override fun reset() {
         pathField?.text = settings.luaboxPath
+        tokenField?.text = settings.githubToken
     }
+
+    private fun effectiveToken(): String =
+        tokenField?.password?.let { String(it) }?.trim().orEmpty()
 
     /**
      * The field's value normalised the same way [LuaboxSettings.luaboxPath] is —
@@ -65,6 +83,7 @@ class LuaboxConfigurable : Configurable {
 
     override fun disposeUIResources() {
         pathField = null
+        tokenField = null
         panel = null
     }
 }
