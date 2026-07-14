@@ -1,1 +1,1 @@
-rootProject.name = "pseudoscript-jetbrains"
+rootProject.name = "luabox-jetbrains"

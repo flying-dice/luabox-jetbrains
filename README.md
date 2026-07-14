@@ -1,110 +1,75 @@
-# PseudoScript for JetBrains IDEs
+# luabox for JetBrains IDEs
 
-[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/32021?label=Marketplace&logo=jetbrains&color=000000)](https://plugins.jetbrains.com/plugin/32021-pseudoscript)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/32021?label=Downloads)](https://plugins.jetbrains.com/plugin/32021-pseudoscript)
-[![Build](https://github.com/flying-dice/pseudoscript-jetbrains/actions/workflows/build.yml/badge.svg)](https://github.com/flying-dice/pseudoscript-jetbrains/actions/workflows/build.yml)
+[![Build](https://github.com/flying-dice/luabox-jetbrains/actions/workflows/build.yml/badge.svg)](https://github.com/flying-dice/luabox-jetbrains/actions/workflows/build.yml)
 
-The IntelliJ-platform plugin for **PseudoScript** (`.pds`) — syntax & semantic
-highlighting, diagnostics, navigation, hover, formatting, and a docs-generation
-menu, all in your JetBrains IDE.
+The IntelliJ-platform plugin for **Lua**, powered by the
+[**luabox**](https://github.com/flying-dice/luabox) toolchain — a unified Lua
+typechecker, linter, formatter, and package manager. It registers `.lua` as a
+first-class file type with bundled base highlighting, and connects the
+`luabox lsp` language server for diagnostics, hover, completion, navigation,
+formatting, and semantic highlighting — all in your JetBrains IDE.
 
-**PseudoScript is a pseudoprogramming language** — you code the abstraction and
-let it autogenerate, rather than hand-maintaining the output. It's the modern
-descendant of codegen and UML, renewed now that LLMs can generate and maintain
-faithfully against a spec. The `.pds` files this plugin edits compile to
-C4-style diagrams and docs via the `pds` toolchain.
-
-**[Install from the JetBrains Marketplace →](https://plugins.jetbrains.com/plugin/32021-pseudoscript)**
-
-> **Looking for the language itself?** PseudoScript — the language, its
-> specification, and the `pds` compiler / LSP / docs toolchain — lives in the
-> main repository:
+> **Looking for the toolchain itself?** luabox — the CLI, typechecker, and
+> `luabox lsp` language server — lives in the main repository:
 >
-> ### → https://github.com/flying-dice/pseudoscript
+> ### → https://github.com/flying-dice/luabox
 >
-> This repository is **only the editor plugin**. It talks to the `pds` binary
-> from that project for everything beyond local syntax highlighting.
+> This repository is **only the editor plugin**. It talks to the `luabox`
+> binary from that project for everything beyond local base highlighting.
 
 ## Features
 
 | Feature | Provided by |
 | --- | --- |
-| Syntax highlighting, comment toggling, brace matching, color-scheme page | bundled lexer (works with no `pds` installed) |
-| Semantic highlighting — role-aware colors for types, params, fields, calls | `pds lsp` → `semanticTokens` |
-| Diagnostics (errors & warnings) | `pds lsp` → `publishDiagnostics` |
-| Hover, Go to definition, Find usages, Rename | `pds lsp` |
-| Formatting | `pds lsp` → `formatting` |
-| Diagrams — each symbol's fitting view: C4 context/container/component, sequence flows, data entity views, feature flow diagrams | `pds svg --symbol` (Structure tree / *Open Diagram*) |
-| **Build / Serve Docs** menu on `pds.toml` | `pds doc` / `pds doc --serve` |
+| Base syntax highlighting — keywords, strings, numbers, comments | bundled lexer (works with no `luabox` installed) |
+| Semantic highlighting — role-aware colors | `luabox lsp` → `semanticTokens` |
+| Diagnostics with quick-fixes | `luabox lsp` → `publishDiagnostics` |
+| Hover, completion, go-to-definition, document symbols | `luabox lsp` |
+| Formatting | `luabox lsp` → `formatting` |
 
-**Highlighting works offline.** The bundled lexer colors a file the moment it
-opens — keywords, types, declarations, members, literals — even before (or
-without) the language server. When `pds lsp` connects, its semantic tokens
-refine the same colors with full role accuracy. Both layers draw from the one
-**Settings → Editor → Color Scheme → PseudoScript** page, so the file looks the
-same with or without the server (you only gain diagnostics, hover, and
-navigation when it's running).
+**Base highlighting works offline.** The bundled lexer colors a `.lua` file the
+moment it opens — even before (or without) the language server. When
+`luabox lsp` connects, its semantic tokens refine the colors with full role
+accuracy, and you gain diagnostics, hover, completion, navigation, and
+formatting.
 
 ## Requirements
 
 - A JetBrains IDE **2025.1 – 2026.1** (any flavor: IDEA Community/Ultimate,
-  RustRover, WebStorm, …).
+  RustRover, WebStorm, …). LSP4IJ makes this work on Community editions too.
 - The [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij) plugin,
   **0.19.4 or newer** — a hard dependency installed automatically from the
-  Marketplace. (The minimum is enforced because `.pds` files use LSP4IJ's
-  semantic-token file view provider; on an older LSP4IJ that class is missing
-  and the plugin fails to load.)
-- The **`pds` binary on your `PATH`** — built and installed from the
-  [PseudoScript repo](https://github.com/flying-dice/pseudoscript) (follow its
-  README; typically `cargo install` from a clone). Not on `PATH`? Point the
-  plugin at it in **Settings → Languages & Frameworks → PseudoScript**.
+  Marketplace.
+- The **`luabox` binary**, from the
+  [luabox releases](https://github.com/flying-dice/luabox/releases). The install
+  scripts drop it in `~/.luabox/bin`; the plugin resolves `luabox` on your
+  `PATH` and in `~/.luabox/bin` automatically. If it lives elsewhere, point the
+  plugin at it in **Settings → Languages & Frameworks → luabox**.
 
-  Without `pds`, you still get the bundled syntax highlighting — but not the
-  LSP-backed features (semantic colors, diagnostics, hover, navigation,
-  formatting, docs menu).
+  Without `luabox`, you still get the bundled base highlighting — but not the
+  LSP-backed features.
 
 ## Install
 
-**From the JetBrains Marketplace** (recommended) — the
-[**PseudoScript** listing](https://plugins.jetbrains.com/plugin/32021-pseudoscript):
-in your IDE, **Settings → Plugins → Marketplace**, search **PseudoScript**, click
-**Install**, and restart when prompted. LSP4IJ is pulled in automatically as a
-dependency.
+**From a zip** (this repo's [Releases](https://github.com/flying-dice/luabox-jetbrains/releases)):
 
-<details>
-<summary>Install from a zip (pre-release or local builds)</summary>
-
-1. Build it: `./gradlew buildPlugin` → `build/distributions/pseudoscript-jetbrains-<version>.zip`
-   (or grab a zip from the [Releases](https://github.com/flying-dice/pseudoscript-jetbrains/releases)).
-2. In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → pick the zip.
-   Install LSP4IJ from the Marketplace first (it isn't bundled in the zip).
-3. Restart when prompted. Reinstalling the same version? Uninstall the old copy
-   first, or the IDE skips the replacement.
-</details>
+1. Grab `luabox-<version>.zip` from a release (or build it yourself — see below).
+2. Install **LSP4IJ** from the Marketplace first (it isn't bundled in the zip).
+3. In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → pick the
+   zip. Restart when prompted.
+4. Ensure `luabox` is installed (see Requirements).
 
 ## Usage
 
-Open any `.pds` file — highlighting is immediate; the language server starts on
-first open. Inspect its traffic in **View → Tool Windows → Language Servers**
-(added by LSP4IJ).
-
-**Generate the docs site.** Right-click a `pds.toml` (Project view, editor, or
-tab) → **PseudoScript**:
-
-| Item | Runs | Result |
-| --- | --- | --- |
-| **Build Docs** | `pds doc <dir>` | Generates the site once. |
-| **Serve Docs** | `pds doc <dir> --serve` | Generates, then serves at `http://127.0.0.1:8000/`. |
-
-`<dir>` is the folder holding the clicked `pds.toml`. Output streams to a
-console tool window; its **stop** button kills the process — that is how you
-stop a running `--serve`.
+Open any `.lua` file — base highlighting is immediate; the language server
+starts on first open when `luabox` is available. Inspect its traffic in
+**View → Tool Windows → Language Servers** (added by LSP4IJ).
 
 ## Configuration
 
-**Settings → Languages & Frameworks → PseudoScript** — the path to the `pds`
-binary (default `pds`, resolved on `PATH`). Shared by the language server and
-the docs menu.
+**Settings → Languages & Frameworks → luabox** — the path to the `luabox`
+binary. A bare name (default `luabox`) is resolved on `PATH`, then in
+`~/.luabox/bin`. The server is launched as `<path> lsp`.
 
 ---
 
@@ -114,33 +79,37 @@ This section is for working on the plugin itself.
 
 ```sh
 ./gradlew runIde          # launch a sandbox IDE with the plugin loaded
-./gradlew buildPlugin     # produce build/distributions/pseudoscript-jetbrains-<version>.zip
+./gradlew buildPlugin     # produce build/distributions/luabox-<version>.zip
 ./gradlew verifyPlugin    # run the JetBrains Plugin Verifier
-./gradlew test            # run the lexer acceptance suite (no IDE needed)
 ```
 
 The build needs **JDK 21** (the 2025.1+ platform requirement); Gradle resolves
 it via the configured toolchain. Run configurations for the common tasks are
 checked in under `.run/`.
 
-**Tests.** Tokenisation has a BDD acceptance suite — Gherkin features run by the
-Cucumber JUnit-Platform engine. Each scenario asserts the exact token category +
-verbatim text, in source order; add a rule by adding a `Scenario` (no new step
-code). Specs in `src/test/resources/features/`, steps in
-`src/test/kotlin/dev/pseudoscript/lexer/steps/`.
-
 **Layout.**
 
 ```
-src/main/kotlin/dev/pseudoscript/
-  lang/        Language, file type, icon, commenter, brace matcher
-  lexer/       highlighting lexer + token types
-  highlight/   syntax highlighter, factory, color settings page
-  lsp/         LSP4IJ factory, pds-lsp launcher, semantic-token colors
-  actions/     Build / Serve Docs context-menu actions
-  settings/    pds binary path (persisted) + settings UI
+src/main/kotlin/com/luabox/
+  lang/          Lua Language, file type, icon, commenter
+  highlight/     base-highlighting lexer + syntax highlighter + factory
+  lsp/           LSP4IJ factory + luabox-lsp launcher
+  settings/      luabox binary path (persisted), resolution + settings UI
+  notification/  missing-binary editor banner
 src/main/resources/META-INF/plugin.xml
 ```
 
 **Versions.** Pinned in `gradle.properties`: `platformVersion`, `lsp4ijVersion`,
 `pluginSinceBuild`, `pluginUntilBuild`. Bump there to retarget IDE builds.
+
+## Releasing
+
+Push a `v*` tag (e.g. `v0.1.0`) matching `pluginVersion` in `gradle.properties`.
+The [release workflow](.github/workflows/release.yml) verifies and builds the
+plugin, then creates a GitHub Release with the plugin zip and a `SHA256SUMS`
+file attached. Marketplace publishing is not wired up (it needs a `JB_TOKEN`
+secret and a pre-existing Marketplace listing).
+
+---
+
+*Forked from [flying-dice/pseudoscript-jetbrains](https://github.com/flying-dice/pseudoscript-jetbrains).*

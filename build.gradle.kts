@@ -30,32 +30,10 @@ dependencies {
     }
 
     implementation(kotlin("stdlib"))
-
-    // Pure-Java vector SVG renderer for the diagram panel — paints `pds svg`
-    // output to a Graphics2D so it stays crisp at any zoom. Bundled into the
-    // plugin (the IDE's own jsvg is internal and version-bound).
-    implementation("com.github.weisj:jsvg:1.4.0")
-
-    // BDD acceptance tests: Gherkin features run by the Cucumber JUnit Platform
-    // engine. The lexer is a plain class, so these need no running IDE.
-    testImplementation("io.cucumber:cucumber-java:7.18.0")
-    testImplementation("io.cucumber:cucumber-junit-platform-engine:7.18.0")
-    testImplementation("org.junit.platform:junit-platform-suite:1.10.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.2")
-    // The IDE classpath registers a JUnit launcher listener that touches JUnit4
-    // API; provide it so the listener initialises instead of crashing the worker.
-    testRuntimeOnly("junit:junit:4.13.2")
 }
 
 kotlin {
     jvmToolchain(21)
-}
-
-tasks.test {
-    useJUnitPlatform()
-    testLogging {
-        events("passed", "failed", "skipped")
-    }
 }
 
 intellijPlatform {
@@ -63,18 +41,27 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         version = providers.gradleProperty("pluginVersion")
 
+        description =
+            "Lua support for JetBrains IDEs via the luabox language server " +
+            "(diagnostics, hover, completion, go-to-definition, document symbols, " +
+            "formatting, semantic highlighting) plus a bundled .lua base-highlighting " +
+            "layer. Forked from flying-dice/pseudoscript-jetbrains."
+
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = providers.gradleProperty("pluginUntilBuild")
+        }
+
+        vendor {
+            name = "flying-dice"
+            url = "https://github.com/flying-dice/luabox"
         }
     }
 
     pluginVerification {
         ides {
             // Verify against the exact build target rather than `recommended()`,
-            // which resolves to IDE versions not always published yet (it picked
-            // an unavailable ideaIC:2025.3 on CI). Add more versions in the
-            // since/until range here as they become available.
+            // which resolves to IDE versions not always published yet.
             ide(
                 IntelliJPlatformType.fromCode(providers.gradleProperty("platformType").get()),
                 providers.gradleProperty("platformVersion").get(),
@@ -83,10 +70,9 @@ intellijPlatform {
     }
 
     // `./gradlew publishPlugin` uploads to the JetBrains Marketplace using a
-    // permanent token (Marketplace → My Tokens), supplied via the JB_TOKEN env
+    // permanent token (Marketplace -> My Tokens), supplied via the JB_TOKEN env
     // var in CI. The very first version must be uploaded manually through the
     // Marketplace web form to create the listing; updates can then be automated.
-    // (Signing is optional — add an `signing { }` block here when desired.)
     publishing {
         token = providers.environmentVariable("JB_TOKEN")
     }
