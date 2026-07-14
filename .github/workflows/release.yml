@@ -1,64 +1,165 @@
-name: Release
+name: release
 
+# Cut a GitHub Release for a pushed `v*` tag: publish the release up front (NOT
+# latest yet), build + attach the packaged plugin zip and its `SHA256SUMS`, then
+# independently re-download and verify those assets before the release is marked
+# `--latest`. A release only goes live after its freshly-built zip has been
+# checksum-verified and structurally validated.
+#
+# Everything happens in this ONE workflow run, triggered by the tag push. A
+# release created here with GITHUB_TOKEN would NOT fire a downstream
+# `release: published` workflow (GitHub suppresses token-raised events), so the
+# whole pipeline is chained by `needs:` instead.
+#
+# This plugin is NEVER auto-published to the JetBrains Marketplace: no
+# publishPlugin, no signing, no marketplace token. Marketplace upload is a
+# deliberate manual step done with the downloaded artifact.
 on:
   push:
-    tags: ["v*"]
-  workflow_dispatch:
+    tags:
+      - "v*"
 
-# Needed to create the GitHub Release and upload assets.
 permissions:
-  contents: write
+  contents: read
 
+# Never run two release pipelines for the same tag concurrently; do not cancel
+# an in-flight one (a half-published release is worse than a slow one).
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Build & release
+  # Publish the release up front so the publish/verify jobs have a target to
+  # attach to and download from. Deliberately NOT marked latest yet
+  # (`--latest=false`) — that is gated behind `verify` and done by `mark-latest`,
+  # so a release only goes live after its freshly-built zip verifies.
+  create-release:
+    name: Create release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
-      # Marketplace publish token (read by `publishPlugin`); empty when the
-      # secret isn't set, which skips the publish step.
-      JB_TOKEN: ${{ secrets.JB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v4
+      - name: Create the GitHub Release (not latest yet)
+        run: |
+          cat > release-notes.md <<EOF
+          ## luabox for JetBrains IDEs ${TAG}
 
+          JetBrains plugin release ${TAG}. See the
+          [README](https://github.com/${GITHUB_REPOSITORY}#readme) for what's in
+          this version.
+
+          The packaged plugin zip and its \`SHA256SUMS\` are attached below —
+          install with **Settings → Plugins → ⚙ → Install Plugin from Disk…**.
+          Install [LSP4IJ](https://plugins.jetbrains.com/plugin/23257-lsp4ij)
+          from the Marketplace first.
+          EOF
+          gh release create "$TAG" \
+            --title "luabox for JetBrains IDEs $TAG" \
+            --notes-file release-notes.md \
+            --draft=false \
+            --latest=false
+
+  # Build the plugin and attach the zip and SHA256SUMS to the release. Does NOT
+  # mark the release latest — that is gated behind `verify`.
+  publish:
+    name: Build & upload
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-
-      # Verify before publishing: only ship a plugin the JetBrains Plugin
-      # Verifier accepts against the target IDE.
-      - name: Verify plugin
-        run: ./gradlew verifyPlugin
-
       - name: Build plugin
         run: ./gradlew buildPlugin
-
-      - name: Checksums
+      - name: Generate SHA256SUMS
         working-directory: build/distributions
-        run: sha256sum *.zip > SHA256SUMS
+        run: |
+          # Bare filename in SHA256SUMS so `sha256sum -c` works from any dir the
+          # zip is downloaded into.
+          sha256sum *.zip > SHA256SUMS
+          cat SHA256SUMS
+      - name: Upload assets to release
+        working-directory: build/distributions
+        run: gh release upload "$TAG" ./*.zip SHA256SUMS --clobber
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ${{ github.ref_name }}
-          generate_release_notes: true
-          files: |
-            build/distributions/*.zip
-            build/distributions/SHA256SUMS
-          fail_on_unmatched_files: true
+  # Gate: independently re-download the just-uploaded assets and prove them good
+  # before the release goes live.
+  #   1. `sha256sum -c` — the published sums match the published bytes.
+  #   2. Unzip the plugin zip, find the descriptor (META-INF/plugin.xml inside a
+  #      jar under lib/), and assert its <id> is com.luabox and <version> equals
+  #      the tag sans `v`.
+  # Only if both pass does `mark-latest` run.
+  verify:
+    name: Verify published assets
+    needs: publish
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Re-verify published checksums against freshly downloaded assets
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"; cd "$work"
+          gh release download "$TAG" \
+            --pattern '*.zip' \
+            --pattern 'SHA256SUMS'
+          echo "--- SHA256SUMS ---"; cat SHA256SUMS
+          # -c exits non-zero if the listed file is missing or its hash differs.
+          sha256sum -c SHA256SUMS
 
-      # Uploads to the JetBrains Marketplace. The plugin listing must already
-      # exist there (the first version is uploaded manually); this fails loudly
-      # until then. Runs last so a Marketplace error doesn't block the GitHub
-      # Release. Skipped automatically when JB_TOKEN isn't configured.
-      - name: Publish to JetBrains Marketplace
-        if: env.JB_TOKEN != ''
-        run: ./gradlew publishPlugin
+      - name: Validate the plugin descriptor and version
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"; cd "$work"
+          gh release download "$TAG" --pattern '*.zip'
+          zip="$(ls ./*.zip)"
+          echo "validating $zip"
+          mkdir plugin && (cd plugin && unzip -q "../$zip")
+          # A JetBrains plugin zip is <name>/lib/*.jar; the descriptor
+          # META-INF/plugin.xml lives inside the plugin's own jar.
+          descriptor=""
+          for jar in plugin/*/lib/*.jar; do
+            if unzip -p "$jar" META-INF/plugin.xml 2>/dev/null | grep -q '<id>com.luabox</id>'; then
+              descriptor="$jar"; break
+            fi
+          done
+          test -n "$descriptor" || { echo "error: no lib jar carries META-INF/plugin.xml with <id>com.luabox</id>" >&2; exit 1; }
+          echo "descriptor found in $descriptor"
+          xml="$(unzip -p "$descriptor" META-INF/plugin.xml)"
+          echo "$xml" | grep -q '<id>com.luabox</id>' || { echo "error: plugin id is not com.luabox" >&2; exit 1; }
+          expected="${TAG#v}"
+          echo "$xml" | grep -q "<version>${expected}</version>" \
+            || { echo "error: plugin.xml <version> != ${expected} (tag sans 'v')" >&2; exit 1; }
+          echo "plugin OK: com.luabox v${expected}, descriptor present"
+
+  # Go-live: mark the release latest, only reachable if `verify` passed. A failed
+  # verify skips this, so the release stays not-latest and the pipeline is red.
+  mark-latest:
+    name: Mark release latest
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Mark latest (go live)
+        run: gh release edit "$TAG" --latest

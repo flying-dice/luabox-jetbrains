@@ -105,10 +105,25 @@ src/main/resources/META-INF/plugin.xml
 ## Releasing
 
 Push a `v*` tag (e.g. `v0.1.0`) matching `pluginVersion` in `gradle.properties`.
-The [release workflow](.github/workflows/release.yml) verifies and builds the
-plugin, then creates a GitHub Release with the plugin zip and a `SHA256SUMS`
-file attached. Marketplace publishing is not wired up (it needs a `JB_TOKEN`
-secret and a pre-existing Marketplace listing).
+The [release workflow](.github/workflows/release.yml) runs a hardened,
+verify-then-latest pipeline in one run:
+
+1. **create-release** — publishes the GitHub Release for the tag, *not* marked
+   latest yet (`--latest=false`).
+2. **publish** — builds the plugin (`buildPlugin`), generates `SHA256SUMS`, and
+   uploads the zip + `SHA256SUMS` as release assets.
+3. **verify** — independently re-downloads those assets, runs `sha256sum -c`,
+   then unzips the plugin zip and structurally asserts the descriptor
+   (`META-INF/plugin.xml` with `<id>com.luabox</id>` and a `<version>` matching
+   the tag).
+4. **mark-latest** — only if verify passes, `gh release edit --latest` takes the
+   release live. A broken artifact can never become the latest release.
+
+**This plugin is never auto-published.** There is no `publishPlugin`, no
+signing, and no Marketplace token anywhere in the build or workflows. Uploading
+a release to the [JetBrains Marketplace](https://plugins.jetbrains.com/) is a
+deliberate manual step performed by the maintainer with the downloaded release
+artifact.
 
 ---
 
