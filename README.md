@@ -53,7 +53,7 @@ formatting.
 
 **From a zip** (this repo's [Releases](https://github.com/flying-dice/luabox-jetbrains/releases)):
 
-1. Grab `luabox-<version>.zip` from a release (or build it yourself — see below).
+1. Grab `luabox-jetbrains-<version>.zip` from a release (or build it yourself — see below).
 2. Install **LSP4IJ** from the Marketplace first (it isn't bundled in the zip).
 3. In the IDE: **Settings → Plugins → ⚙ → Install Plugin from Disk…** → pick the
    zip. Restart when prompted.
@@ -79,7 +79,7 @@ This section is for working on the plugin itself.
 
 ```sh
 ./gradlew runIde          # launch a sandbox IDE with the plugin loaded
-./gradlew buildPlugin     # produce build/distributions/luabox-<version>.zip
+./gradlew buildPlugin     # produce build/distributions/luabox-jetbrains-<version>.zip
 ./gradlew verifyPlugin    # run the JetBrains Plugin Verifier
 ```
 
