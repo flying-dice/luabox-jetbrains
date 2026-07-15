@@ -29,7 +29,12 @@ object LuaboxSignIn {
     }
 }
 
-/** Action `luabox.signInGithub`: start GitHub device-flow sign-in for luabox. */
+/**
+ * Action `luabox.signInGithub`: start GitHub device-flow sign-in for luabox.
+ * Optional — it only benefits git-source dependency operations
+ * (`outdated`/`update`'s GitHub release probing and private-repo access); the
+ * luarocks.org registry (search/install) is always anonymous.
+ */
 class LuaboxSignInAction : AnAction(), DumbAware {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 

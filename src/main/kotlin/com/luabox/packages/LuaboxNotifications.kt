@@ -11,8 +11,9 @@ import com.luabox.settings.LuaboxBinary
 /**
  * Balloon notifications for package-management and sign-in outcomes. The group id
  * `luabox` is registered in plugin.xml. Errors carry contextual actions — a
- * sign-in hint on rate-limit, a settings/install link when the binary is missing,
- * a releases link when the CLI is too old for device-flow sign-in.
+ * sign-in hint on rate-limit (a git-source dependency operation, since registry
+ * search/install is anonymous), a settings/install link when the binary is
+ * missing, a releases link when the CLI is too old for device-flow sign-in.
  */
 object LuaboxNotifications {
     private const val GROUP_ID = "luabox"
@@ -27,7 +28,8 @@ object LuaboxNotifications {
         val notification: Notification = when {
             ex.isRateLimited -> group()
                 .createNotification(
-                    "GitHub rate limit reached. Sign in with GitHub to raise the limit.",
+                    "GitHub rate limit reached while checking git-source dependencies. " +
+                        "Sign in with GitHub to raise the limit.",
                     NotificationType.WARNING,
                 )
                 .addAction(NotificationAction.createSimple("Sign in with GitHub") {

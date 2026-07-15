@@ -26,7 +26,7 @@ formatting, and semantic highlighting — all in your JetBrains IDE.
 | Diagnostics with quick-fixes | `luabox lsp` → `publishDiagnostics` |
 | Hover, completion, go-to-definition, document symbols | `luabox lsp` |
 | Formatting | `luabox lsp` → `formatting` |
-| Dependency management — discover, install, outdated/update/remove | `luabox` CLI (`search`, `outdated`, `add`, `remove`, `update`) |
+| Dependency management — discover on luarocks.org, install, outdated/update/remove | `luabox` CLI (`search`, `outdated`, `add`, `remove`, `update`) |
 
 **Base highlighting works offline.** The bundled lexer colors a `.lua` file the
 moment it opens — even before (or without) the language server. When
@@ -69,55 +69,68 @@ starts on first open when `luabox` is available. Inspect its traffic in
 ## Dependency management
 
 The **luabox Packages** tool window (right-anchored — **View → Tool Windows →
-luabox Packages**) is an npm-like GUI over the luabox CLI's GitHub-as-registry
-commands. It shells out to the same `luabox` binary the language server uses, in
-your project's base directory, and renders the JSON it prints.
+luabox Packages**) is an npm-like GUI over the luabox CLI's
+[luarocks.org](https://luarocks.org)-as-registry commands. It shells out to the
+same `luabox` binary the language server uses, in your project's base
+directory, and renders the JSON it prints. Registry search and install are
+**anonymous** — no sign-in needed.
 
-- **Discover.** Type a query and press Enter to run `luabox search`. Each result
-  is a card — package name, `owner/repo`, ★ stars, description, and latest tag —
-  with an **Install** button that runs `luabox add <name> --git <url> --tag
-  <latest>` to add it as a dependency.
+- **Discover.** Type a query and press Enter to run `luabox search` against
+  luarocks.org. Each result is a card — rock name, latest version, version
+  count, and description (when the registry has one) — with an **Install**
+  button that runs a bare `luabox add <name>`, which resolves the highest
+  available version and edits the project's rockspec (the package manifest).
 - **Installed.** Every dependency from `luabox outdated` is listed with its
-  current pin. Git deps that have a newer tag show an **outdated: current →
-  latest** indicator and an **Update** button (`luabox update <name>`, re-pins to
-  the latest tag); **Remove** runs `luabox remove <name>`. Non-git deps
-  (path/workspace/registry) are read-only. The toolbar has **Refresh** and an
+  current pin. Registry and git deps that have a newer version show an
+  **outdated: current → latest** indicator and an **Update** button
+  (`luabox update <name>`); path/workspace deps are used in place, and a `url`
+  dep is pinned by sha256 (immutable) — neither has an Update button. **Remove**
+  (`luabox remove <name>`) works for every dependency kind, wherever it's
+  declared (rockspec or `luabox.toml`). The toolbar has **Refresh** and an
   outdated-count label.
 - The Installed view refreshes automatically after any install/update/remove and
-  whenever `luabox.toml` changes on disk.
+  whenever `luabox.toml` or the project's root `*.rockspec` changes on disk.
 
 Edge states are handled: no `luabox.toml` → a "run `luabox new`" hint; the
-`luabox` binary not found → a configure/install prompt; a GitHub rate-limit (403)
-→ a notification linking to **Sign in with GitHub**.
+`luabox` binary not found → a configure/install prompt; a GitHub rate-limit
+(403) on a **git-source** dependency operation → a notification linking to
+**Sign in with GitHub**.
 
-**Requires the `luabox` CLI ≥ 0.1.3** (the version that ships the `search`,
-`outdated`, `add`, `remove`, and `update` commands with `--format json`).
-Device-flow **sign-in** (below) needs **≥ 0.1.4**.
+**Requires a `luabox` CLI build with the luarocks.org registry pivot** (the
+`search`/`outdated` JSON schemas this panel parses, and the rockspec-editing
+`add`). Device-flow **sign-in** (below) needs `luabox` ≥ 0.1.4.
 
-## Authentication
+## Authentication (optional)
 
-GitHub is the package registry, so signing in raises your API rate limit and
-grants access to private repositories. The normal path is **device-flow sign-in**
-from the tool window — no token to paste, nothing stored by the plugin.
+GitHub sign-in is **optional** and no longer fronts the Packages tool window:
+the luarocks.org registry (search/install) is always anonymous. Signing in only
+benefits **git-source** dependencies — it raises the GitHub API rate limit and
+grants access to private repositories for `luabox outdated`/`luabox update`'s
+release probing. The path is **device-flow sign-in**, in a footer auth bar
+below Discover/Installed — no token to paste, nothing stored by the plugin.
 
-- The luabox Packages tool window has an **auth bar**. When you're not signed in
-  it shows **Sign in with GitHub**; there's also a `luabox.signInGithub` action
-  (searchable via *Find Action*).
-- Clicking it runs `luabox login`. A notification shows your one-time **user
-  code** and the verification URL. **Copy code & open browser** copies the code
-  and opens <https://github.com/login/device>; enter the code there and authorize.
-- The plugin waits (the code is valid ~15 min; **Cancel** aborts). On success the
-  auth bar shows **✓ Signed in as _you_** with a **Sign out** button.
-- The **CLI stores the token in your OS keychain**, so afterwards search, outdated
-  and version resolution authenticate automatically — **the plugin passes no
+- The luabox Packages tool window has a footer **auth bar**. When you're not
+  signed in it shows **GitHub sign-in: optional (for git-source
+  dependencies)**; there's also a `luabox.signInGithub` action (searchable via
+  *Find Action*).
+- Clicking **Sign in with GitHub** runs `luabox login`. A notification shows
+  your one-time **user code** and the verification URL. **Copy code & open
+  browser** copies the code and opens <https://github.com/login/device>; enter
+  the code there and authorize.
+- The plugin waits (the code is valid ~15 min; **Cancel** aborts). On success
+  the auth bar shows **✓ GitHub: signed in as _you_** with a **Sign out**
+  button.
+- The **CLI stores the token in your OS keychain**, so afterwards git-source
+  dependency operations authenticate automatically — **the plugin passes no
   token** for signed-in users. **Sign out** runs `luabox logout` (clears the
   keychain).
 - Device-flow sign-in requires the **`luabox` CLI ≥ 0.1.4**. On an older CLI the
   sign-in reports that and links to the luabox releases.
 
-The **GitHub token** setting (below) is an optional **PAT override** for
-restricted orgs or GitHub Enterprise; when set it takes precedence over the
-keychain sign-in. In that mode the auth bar shows *(token override)*.
+The **GitHub token** setting (below) is an optional **PAT override**, also
+git-source-only, for restricted orgs or GitHub Enterprise; when set it takes
+precedence over the keychain sign-in. In that mode the auth bar shows *(token
+override)*.
 
 ## Configuration
 
@@ -126,11 +139,13 @@ keychain sign-in. In that mode the auth bar shows *(token override)*.
 - **Path to the luabox binary** — a bare name (default `luabox`) is resolved on
   `PATH`, then in `~/.luabox/bin`. The server is launched as `<path> lsp`, and
   the package-management commands run the same binary.
-- **GitHub token override** (optional) — a PAT passed to the CLI as
-  `LUABOX_GITHUB_TOKEN`. Device-flow **Sign in with GitHub** (see
-  [Authentication](#authentication)) is the normal path; use this field only as an
-  override for restricted orgs or GitHub Enterprise. When set it takes precedence
-  over the keychain sign-in.
+- **GitHub token override** (optional, git-source dependencies only) — a PAT
+  passed to the CLI as `LUABOX_GITHUB_TOKEN`. Registry search/install
+  (luarocks.org) never uses it; it only affects `luabox outdated`/`luabox
+  update`'s GitHub release probing and private-repo access. Device-flow **Sign
+  in with GitHub** (see [Authentication](#authentication-optional)) is the
+  normal path; use this field only as an override for restricted orgs or GitHub
+  Enterprise. When set it takes precedence over the keychain sign-in.
 
 ---
 

@@ -21,10 +21,14 @@ class LuaboxSettings :
 
         /**
          * Optional GitHub token OVERRIDE, passed to the `luabox` CLI as
-         * `LUABOX_GITHUB_TOKEN`. The normal auth path is device-flow sign-in
-         * (`luabox login`), whose token the CLI stores in the OS keychain; this
-         * field is an override for restricted orgs / GHE and takes precedence over
-         * the keychain when set. Blank means "don't pass one".
+         * `LUABOX_GITHUB_TOKEN`. Only relevant to **git-source** dependency
+         * operations (`luabox outdated`/`luabox update`'s release probing and
+         * private-repo access) — the luarocks.org registry (search/install) is
+         * always anonymous and never uses it. The normal auth path is
+         * device-flow sign-in (`luabox login`), whose token the CLI stores in
+         * the OS keychain; this field is an override for restricted orgs / GHE
+         * and takes precedence over the keychain when set. Blank means "don't
+         * pass one".
          */
         var githubToken: String? by string("")
     }

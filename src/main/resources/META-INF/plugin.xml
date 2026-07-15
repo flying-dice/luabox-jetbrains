@@ -23,6 +23,13 @@
             <li><b>Diagnostics with quick-fixes, hover, completion, go-to-definition,
                 document symbols, formatting, and semantic highlighting</b> via
                 the <code>luabox lsp</code> language server.</li>
+            <li>A <b>luabox Packages</b> tool window: an npm-like dependency
+                manager over <a href="https://luarocks.org">luarocks.org</a> (the
+                registry), backed by the <code>luabox</code> CLI's
+                <code>search</code>/<code>outdated</code>/<code>add</code>/<code>update</code>/<code>remove</code>.
+                Registry search and install are anonymous — no sign-in required.
+                GitHub sign-in is optional, and only benefits git-source
+                dependencies (rate limits, private repos).</li>
         </ul>
 
         <h3>Requirements</h3>
@@ -40,6 +47,21 @@
 
     <change-notes><![CDATA[
         <ul>
+            <li><b>0.3.0</b> — Realigned the luabox Packages tool window with the
+                CLI's luarocks.org registry pivot (<b>breaking</b>: no backwards
+                compatibility with pre-pivot <code>luabox</code> builds).
+                <b>Discover</b> now searches luarocks.org anonymously and shows
+                name/latest-version/description instead of GitHub stars/topics;
+                <b>Install</b> runs a bare <code>luabox add &lt;name&gt;</code>,
+                which edits the project's rockspec. <b>Installed</b> gains an
+                <b>Update</b> action for registry deps too (previously git-only);
+                <b>Remove</b> now works for every dependency kind. GitHub sign-in
+                is demoted to an optional footer bar — it never gates search or
+                install, and only benefits git-source dependency operations
+                (<code>outdated</code>/<code>update</code> rate limits and private
+                repos). The Installed view now also refreshes on changes to the
+                project's root <code>*.rockspec</code>, not just
+                <code>luabox.toml</code>.</li>
             <li><b>0.2.1</b> — <b>Sign in with GitHub</b> from the luabox Packages
                 tool window. A new auth bar runs the CLI's device-flow
                 <code>luabox login</code>: it shows your one-time code, opens
@@ -123,9 +145,10 @@
             implementation="com.luabox.notification.LuaboxMissingBinaryEditorNotificationProvider"/>
 
         <!--
-          The npm-like package-management UI: discover luabox packages on GitHub,
-          Install as dependencies, and manage installed deps (outdated indicators,
-          Update, Remove) — all via the `luabox` CLI. Right-anchored.
+          The npm-like package-management UI: discover rocks on luarocks.org
+          (the registry, anonymous), Install as dependencies, and manage
+          installed deps (outdated indicators, Update, Remove) — all via the
+          `luabox` CLI. Right-anchored.
         -->
         <toolWindow
             id="luabox Packages"
@@ -141,13 +164,14 @@
         <!--
           Start the GitHub device-flow sign-in (luabox login) from anywhere: it
           activates the luabox Packages tool window and kicks off the same flow as
-          the auth bar's "Sign in with GitHub" button.
+          the auth bar's "Sign in with GitHub" button. Optional: the luarocks.org
+          registry is anonymous — this only benefits git-source dependencies.
         -->
         <action
             id="luabox.signInGithub"
             class="com.luabox.packages.LuaboxSignInAction"
-            text="Sign in with GitHub (luabox)"
-            description="Sign in to GitHub for luabox package management using the device flow."/>
+            text="Sign in with GitHub (luabox, optional)"
+            description="Optional: sign in to GitHub (device flow) to raise rate limits and access private repos for luabox git-source dependencies. The luarocks.org registry never needs this."/>
     </actions>
 
     <extensions defaultExtensionNs="com.redhat.devtools.lsp4ij">

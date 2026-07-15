@@ -37,18 +37,23 @@ import javax.swing.JPanel
 
 /**
  * The "luabox Packages" tool window UI: an npm-like package manager backed by
- * the `luabox` CLI.
+ * the `luabox` CLI, fronted by the luarocks.org registry.
  *
  * Top: a toolbar with Refresh + an outdated-count label. Body (a vertical split):
- *  - Discover — a search field over `luabox search`, one card per result with an
- *    Install action.
+ *  - Discover — a search field over `luabox search` (anonymous luarocks.org
+ *    reads), one card per rock with an Install action (`luabox add <name>`).
  *  - Installed — one row per dependency from `luabox outdated`, with an
- *    "outdated: current → latest" indicator and Update/Remove for git deps
- *    (non-git deps are read-only).
+ *    "outdated: current → latest" indicator and Update for updatable
+ *    (`git`/`registry`) deps; Remove works for every dependency.
+ *
+ * A footer auth bar offers GitHub device-flow sign-in — **optional**: registry
+ * search/install never uses it, it only raises rate limits and grants
+ * private-repo access for **git-source** dependency operations
+ * (`outdated`/`update`).
  *
  * Every CLI call runs off the EDT via [Task.Backgroundable]; the UI is rebuilt on
  * the EDT in the task's onSuccess. Mutations and any VFS change to `luabox.toml`
- * refresh the Installed view.
+ * or the root `*.rockspec` refresh the Installed view.
  */
 class LuaboxPackagesPanel(private val project: Project) :
     SimpleToolWindowPanel(true, true), Disposable {
@@ -74,16 +79,29 @@ class LuaboxPackagesPanel(private val project: Project) :
 
         searchField.textEditor.addActionListener { doSearch(searchField.text) }
 
-        // Rebuild the Installed view when luabox.toml changes on disk (e.g. the
-        // CLI mutating it, or an external edit).
+        // Rebuild the Installed view when luabox.toml or the project's root
+        // rockspec changes on disk (e.g. the CLI mutating either, or an
+        // external edit). Registry deps live in the rockspec; path/git/
+        // workspace deps live in luabox.toml — both are watched.
         project.messageBus.connect(this).subscribe(
             VirtualFileManager.VFS_CHANGES,
             object : BulkFileListener {
                 override fun after(events: MutableList<out VFileEvent>) {
-                    if (events.any { it.file?.name == "luabox.toml" }) refreshInstalled()
+                    if (events.any { isWatchedManifestChange(it) }) refreshInstalled()
                 }
             },
         )
+    }
+
+    /** Whether [event] touches `luabox.toml` or a root-level `*.rockspec`. */
+    private fun isWatchedManifestChange(event: VFileEvent): Boolean {
+        val file = event.file ?: return false
+        if (file.name == "luabox.toml") return true
+        if (!file.name.endsWith(".rockspec")) return false
+        // The CLI's package manifest is the single rockspec at the project
+        // root (SPEC.md §6) — a nested one (e.g. inside lua_modules) is not.
+        val base = project.basePath ?: return false
+        return file.parent?.path == base
     }
 
     // --- layout ------------------------------------------------------------
@@ -103,14 +121,15 @@ class LuaboxPackagesPanel(private val project: Project) :
         actionRow.add(actionToolbar.component, BorderLayout.WEST)
         outdatedLabel.border = JBUI.Borders.emptyRight(10)
         actionRow.add(outdatedLabel, BorderLayout.EAST)
-
-        // Stack the action row above the GitHub auth bar.
-        val stack = JPanel(BorderLayout())
-        stack.add(actionRow, BorderLayout.NORTH)
-        stack.add(buildAuthBar(), BorderLayout.SOUTH)
-        return stack
+        return actionRow
     }
 
+    /**
+     * The GitHub sign-in bar: demoted to a footer, not the toolbar — the
+     * registry (luarocks.org) is anonymous, so this never gates Discover or
+     * Installed. It only benefits git-source dependency operations
+     * (`outdated`/`update`'s GitHub release probing and private-repo access).
+     */
     private fun buildAuthBar(): JComponent {
         authBar.border = JBUI.Borders.compound(
             JBUI.Borders.customLine(JBColor.border(), 1, 0, 0, 0),
@@ -142,7 +161,13 @@ class LuaboxPackagesPanel(private val project: Project) :
         val split = com.intellij.ui.JBSplitter(true, 0.5f)
         split.firstComponent = discover
         split.secondComponent = installed
-        return split
+
+        // The auth bar is a footer beneath Discover/Installed, not part of the
+        // toolbar — optional and out of the way of the anonymous registry flow.
+        val wrapper = JPanel(BorderLayout())
+        wrapper.add(split, BorderLayout.CENTER)
+        wrapper.add(buildAuthBar(), BorderLayout.SOUTH)
+        return wrapper
     }
 
     private fun sectionHeader(text: String): JComponent =
@@ -229,15 +254,16 @@ class LuaboxPackagesPanel(private val project: Project) :
         if (who.viaTokenOverride) {
             // Authenticating via the LUABOX_GITHUB_TOKEN PAT override, not the
             // keychain — `luabox logout` wouldn't change this, so offer settings.
-            authStatusLabel.text = "✓ Signed in as $login (token override)"
+            authStatusLabel.text = "✓ GitHub: signed in as $login (token override)"
             authButtonPanel.add(
                 JButton("Manage token…").apply {
-                    toolTipText = "This session uses the GitHub token override in Settings"
+                    toolTipText =
+                        "This session uses the GitHub token override in Settings, for git-source dependencies"
                     addActionListener { LuaboxBinary.openSettings(project) }
                 },
             )
         } else {
-            authStatusLabel.text = "✓ Signed in as $login"
+            authStatusLabel.text = "✓ GitHub: signed in as $login"
             authButtonPanel.add(
                 JButton("Sign out").apply {
                     toolTipText = "Run luabox logout (clears the CLI's stored GitHub token)"
@@ -250,11 +276,14 @@ class LuaboxPackagesPanel(private val project: Project) :
 
     private fun renderAuthSignedOut() {
         authButtonPanel.removeAll()
-        authStatusLabel.text = "Not signed in"
+        authStatusLabel.text = "GitHub sign-in: optional (for git-source dependencies)"
         authStatusLabel.foreground = JBColor.GRAY
         authButtonPanel.add(
             JButton("Sign in with GitHub").apply {
-                toolTipText = "Sign in to GitHub with the device flow (opens your browser)"
+                toolTipText =
+                    "Optional: raises GitHub's API rate limit and grants private-repo access for " +
+                        "git-source dependencies (outdated/update). Registry search and install " +
+                        "(luarocks.org) never need this."
                 addActionListener { signIn() }
             },
         )
@@ -357,7 +386,7 @@ class LuaboxPackagesPanel(private val project: Project) :
 
     private fun renderInstalled(deps: List<Dependency>) {
         installedContainer.removeAll()
-        val outdatedCount = deps.count { it.isGit && it.outdated }
+        val outdatedCount = deps.count { it.isUpdatable && it.outdated }
         outdatedLabel.text = when {
             deps.isEmpty() -> ""
             outdatedCount == 0 -> "Up to date"
@@ -376,23 +405,21 @@ class LuaboxPackagesPanel(private val project: Project) :
         info.add(JBLabel(pkg.name).apply { font = JBFont.label().asBold() })
 
         val meta = buildString {
-            if (pkg.repo.isNotBlank()) append(pkg.repo)
-            append("   ★ ").append(pkg.stars)
-            pkg.latest?.let { append("   latest ").append(it) }
+            append(pkg.latest?.let { "latest $it" } ?: "no tagged release")
+            append("   ").append(pkg.versions).append(if (pkg.versions == 1) " version" else " versions")
         }
         info.add(secondaryLabel(meta))
         pkg.description?.takeIf { it.isNotBlank() }?.let { info.add(secondaryLabel(truncate(it))) }
 
         val install = JButton("Install").apply {
-            toolTipText = pkg.latest?.let { "Add ${pkg.name} @ $it as a dependency" }
-                ?: "This package has no tagged release to install"
-            isEnabled = pkg.latest != null && pkg.url.isNotBlank()
+            toolTipText = pkg.latest?.let { "luabox add ${pkg.name}  (resolves to $it)" }
+                ?: "This rock has no numeric-versioned release to install"
+            isEnabled = pkg.latest != null
             addActionListener { installPackage(pkg) }
         }
         val open = JButton("Open").apply {
-            toolTipText = "Open ${pkg.repo} on GitHub"
-            isEnabled = pkg.url.isNotBlank()
-            addActionListener { BrowserUtil.browse(pkg.url) }
+            toolTipText = "Open ${pkg.name} on luarocks.org"
+            addActionListener { BrowserUtil.browse("https://luarocks.org/modules/${pkg.name}") }
         }
         return row(info, listOf(install, open))
     }
@@ -407,7 +434,7 @@ class LuaboxPackagesPanel(private val project: Project) :
         }
         info.add(secondaryLabel(meta))
 
-        if (dep.isGit && dep.outdated && dep.latest != null) {
+        if (dep.isUpdatable && dep.outdated && dep.latest != null) {
             val from = dep.current ?: "?"
             info.add(
                 JBLabel("outdated: $from → ${dep.latest}").apply {
@@ -415,23 +442,30 @@ class LuaboxPackagesPanel(private val project: Project) :
                 },
             )
         }
+        if (!dep.isUpdatable) {
+            info.add(secondaryLabel(immutableNote(dep.kind)))
+        }
 
         val actions = mutableListOf<JButton>()
-        if (dep.isGit) {
-            if (dep.outdated) {
-                actions += JButton("Update").apply {
-                    toolTipText = "Re-pin ${dep.name} to its latest tag"
-                    addActionListener { updateDependency(dep) }
-                }
+        if (dep.isUpdatable && dep.outdated) {
+            actions += JButton("Update").apply {
+                toolTipText = "Update ${dep.name} to its latest available version"
+                addActionListener { updateDependency(dep) }
             }
-            actions += JButton("Remove").apply {
-                toolTipText = "Remove ${dep.name} from luabox.toml"
-                addActionListener { removeDependency(dep) }
-            }
-        } else {
-            info.add(secondaryLabel("read-only (${dep.kind} dependency)"))
+        }
+        actions += JButton("Remove").apply {
+            toolTipText = "Remove ${dep.name} (luabox remove), from the rockspec or luabox.toml as declared"
+            addActionListener { removeDependency(dep) }
         }
         return row(info, actions)
+    }
+
+    /** Why a non-[Dependency.isUpdatable] dependency has no Update button. */
+    private fun immutableNote(kind: String): String = when (kind) {
+        "url" -> "pinned by sha256 — immutable, never outdated"
+        "path" -> "path dependency — used in place"
+        "workspace" -> "workspace dependency — used in place"
+        else -> "$kind dependency"
     }
 
     private fun row(info: JComponent, buttons: List<JButton>): JComponent {
@@ -489,16 +523,16 @@ class LuaboxPackagesPanel(private val project: Project) :
     // --- mutations ---------------------------------------------------------
 
     private fun installPackage(pkg: PackageResult) {
-        val tag = pkg.latest ?: return
-        runBg("Installing ${pkg.name}", { LuaboxCli.add(project, pkg.name, pkg.url, tag) }) {
-            LuaboxNotifications.info(project, "Installed ${pkg.name} @ $tag.")
+        pkg.latest ?: return
+        runBg("Installing ${pkg.name}", { LuaboxCli.add(project, pkg.name) }) {
+            LuaboxNotifications.info(project, "Added ${pkg.name} to the rockspec.")
             refreshInstalled()
         }
     }
 
     private fun updateDependency(dep: Dependency) {
         runBg("Updating ${dep.name}", { LuaboxCli.update(project, dep.name) }) {
-            LuaboxNotifications.info(project, "Updated ${dep.name} to its latest tag.")
+            LuaboxNotifications.info(project, "Updated ${dep.name} to its latest available version.")
             refreshInstalled()
         }
     }
@@ -506,7 +540,7 @@ class LuaboxPackagesPanel(private val project: Project) :
     private fun removeDependency(dep: Dependency) {
         val confirm = Messages.showYesNoDialog(
             project,
-            "Remove ${dep.name} from luabox.toml?",
+            "Remove ${dep.name}?",
             "Remove Dependency",
             Messages.getQuestionIcon(),
         )

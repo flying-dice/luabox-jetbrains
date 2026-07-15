@@ -10,20 +10,24 @@ import com.luabox.settings.LuaboxBinary
 import com.luabox.settings.LuaboxSettings
 import java.io.File
 
-/** A discovered package from `luabox search --format json`. */
+/**
+ * A discovered rock from `luabox search --format json` (luarocks.org, the
+ * registry — an anonymous read, so results carry no GitHub metadata). [latest]
+ * is `null` when the rock has no numeric-versioned release; [description] is
+ * always `null` for now — the luarocks.org manifest a listing reads carries no
+ * per-rock description (see the CLI's `search_cmd.rs`).
+ */
 data class PackageResult(
     val name: String,
-    val repo: String,
-    val url: String,
-    val description: String?,
-    val stars: Int,
     val latest: String?,
-    val topics: List<String>,
+    val versions: Int,
+    val description: String?,
 )
 
 /** An installed dependency from `luabox outdated --format json`. */
 data class Dependency(
     val name: String,
+    /** `git` | `path` | `workspace` | `registry` | `url`. */
     val kind: String,
     val repo: String?,
     val url: String?,
@@ -31,18 +35,30 @@ data class Dependency(
     val latest: String?,
     val outdated: Boolean,
 ) {
-    /** git deps are the only ones we can update/remote-resolve; others are read-only. */
-    val isGit: Boolean get() = kind == "git"
+    /**
+     * Whether `luabox update [name]` can move this dependency's pin: a `git`
+     * dep re-pins a tag to its GitHub repo's latest release, a `registry` dep
+     * re-resolves to the highest luarocks.org version satisfying its
+     * constraint. `path`/`workspace` deps have nothing to move, and a `url`
+     * dep is pinned by sha256 — immutable content, never outdated or
+     * updatable (see the CLI's `deps_cmd.rs` `update`/`outdated_cmd.rs`).
+     */
+    val isUpdatable: Boolean get() = kind == "git" || kind == "registry"
 }
 
 /**
- * GitHub auth state from `luabox whoami --format json`:
- * `{"login":"<user>|null","source":"keychain|env|null"}`. [login] null means not
- * signed in; [source] tells us how the CLI is authenticating — `keychain` (the
- * device-flow login the plugin drives), `env` (a `LUABOX_GITHUB_TOKEN` PAT
- * override), or null.
+ * Auth state from `luabox whoami --format json`:
+ * `{"login":"<user>|null","source":"keychain|env|null","luarocks":bool}`.
+ * [login] null means not signed in to GitHub; [source] tells us how the CLI is
+ * authenticating — `keychain` (the device-flow login the plugin drives), `env`
+ * (a `LUABOX_GITHUB_TOKEN` PAT override), or null. GitHub auth only matters for
+ * **git-source** dependency operations (`outdated`/`update`'s release
+ * probing) — luarocks.org registry search/install are always anonymous.
+ * [luarocks] is additive: whether a luarocks.org API key is configured for
+ * `luabox publish` (`luabox login --luarocks`); the plugin doesn't drive that
+ * flow yet, but surfaces it for forward compatibility.
  */
-data class WhoAmI(val login: String?, val source: String?) {
+data class WhoAmI(val login: String?, val source: String?, val luarocks: Boolean) {
     val signedIn: Boolean get() = login != null
     val viaTokenOverride: Boolean get() = source == "env"
 }
@@ -77,11 +93,12 @@ object LuaboxCli {
         return File(base, "luabox.toml").isFile
     }
 
-    /** `luabox search [QUERY] --format json`. Empty query lists all topic:luabox packages. */
+    /** `luabox search [QUERY] --format json`. Empty query lists the registry (capped). */
     fun search(project: Project, query: String): List<PackageResult> {
         val args = mutableListOf("search")
         if (query.isNotBlank()) args += query.trim()
         args += listOf("--format", "json")
+        // Anonymous luarocks.org read — never rate-limit-classified.
         val json = runJson(project, args)
         val results = json.getAsJsonArray("results") ?: return emptyList()
         return results.mapNotNull { el ->
@@ -89,19 +106,19 @@ object LuaboxCli {
             val name = o.str("name") ?: return@mapNotNull null
             PackageResult(
                 name = name,
-                repo = o.str("repo") ?: "",
-                url = o.str("url") ?: "",
-                description = o.str("description"),
-                stars = o.int("stars"),
                 latest = o.str("latest"),
-                topics = o.strList("topics"),
+                versions = o.int("versions"),
+                description = o.str("description"),
             )
         }
     }
 
-    /** `luabox outdated --format json`. */
+    /**
+     * `luabox outdated --format json`. Git-source deps make GitHub release
+     * calls, so a 403/rate-limit failure here is classified [LuaboxCliException.isRateLimited].
+     */
     fun outdated(project: Project): List<Dependency> {
-        val json = runJson(project, listOf("outdated", "--format", "json"))
+        val json = runJson(project, listOf("outdated", "--format", "json"), rateLimitAware = true)
         val deps = json.getAsJsonArray("dependencies") ?: return emptyList()
         return deps.mapNotNull { el ->
             val o = el as? JsonObject ?: return@mapNotNull null
@@ -118,30 +135,42 @@ object LuaboxCli {
         }
     }
 
-    /** `luabox add <name> --git <url> --tag <tag>`. */
-    fun add(project: Project, name: String, gitUrl: String, tag: String) {
-        run(project, listOf("add", name, "--git", gitUrl, "--tag", tag))
+    /**
+     * `luabox add <name>[@<versionReq>]` — a bare luarocks.org registry add;
+     * the CLI edits the project's rockspec and installs. An absent/blank
+     * [versionReq] lets the CLI resolve the highest available version. Anonymous
+     * (registry reads/edits never touch GitHub) — never rate-limit-classified.
+     */
+    fun add(project: Project, name: String, versionReq: String? = null) {
+        val spec = if (versionReq.isNullOrBlank()) name else "$name@$versionReq"
+        run(project, listOf("add", spec))
     }
 
-    /** `luabox remove <name>`. */
+    /** `luabox remove <name>` — drops it from wherever it's declared (rockspec or `luabox.toml`). */
     fun remove(project: Project, name: String) {
         run(project, listOf("remove", name))
     }
 
-    /** `luabox update <name>` — re-pins to the latest tag. */
+    /**
+     * `luabox update [name]` — re-pins a tag-pinned git dep to its GitHub
+     * repo's latest release and/or re-resolves `name` to the highest
+     * satisfying version. A git-source operation: 403/rate-limit failures are
+     * classified [LuaboxCliException.isRateLimited].
+     */
     fun update(project: Project, name: String) {
-        run(project, listOf("update", name))
+        run(project, listOf("update", name), rateLimitAware = true)
     }
 
     /**
-     * `luabox whoami --format json` — who the CLI is authenticated as, and how.
-     * On older CLIs without the subcommand (or when not signed in and the CLI
+     * `luabox whoami --format json` — who the CLI is authenticated to GitHub
+     * as (and how), plus whether a luarocks.org API key is configured. On
+     * older CLIs without the subcommand (or when not signed in and the CLI
      * exits non-zero) this throws [LuaboxCliException]; the caller treats that as
      * "not signed in" rather than surfacing an error.
      */
     fun whoami(project: Project): WhoAmI {
         val json = runJson(project, listOf("whoami", "--format", "json"))
-        return WhoAmI(login = json.str("login"), source = json.str("source"))
+        return WhoAmI(login = json.str("login"), source = json.str("source"), luarocks = json.bool("luarocks"))
     }
 
     /** `luabox logout` — clears the CLI keychain. Idempotent. */
@@ -151,8 +180,8 @@ object LuaboxCli {
 
     // --- internals ---------------------------------------------------------
 
-    private fun runJson(project: Project, args: List<String>): JsonObject {
-        val out = run(project, args)
+    private fun runJson(project: Project, args: List<String>, rateLimitAware: Boolean = false): JsonObject {
+        val out = run(project, args, rateLimitAware)
         return try {
             JsonParser.parseString(out).asJsonObject
         } catch (e: Exception) {
@@ -162,7 +191,13 @@ object LuaboxCli {
         }
     }
 
-    private fun run(project: Project, args: List<String>): String {
+    /**
+     * @param rateLimitAware whether a 403/"rate limit" failure should be
+     *   classified [LuaboxCliException.isRateLimited]. Registry (luarocks.org)
+     *   operations are anonymous and never hit GitHub, so this is `false` by
+     *   default; only git-source operations (`outdated`, `update`) opt in.
+     */
+    private fun run(project: Project, args: List<String>, rateLimitAware: Boolean = false): String {
         if (!LuaboxBinary.isAvailable()) {
             throw LuaboxCliException(LuaboxBinary.notFoundMessage(), binaryMissing = true)
         }
@@ -191,8 +226,8 @@ object LuaboxCli {
         }
         if (output.exitCode != 0) {
             val err = (output.stderr.trim() + "\n" + output.stdout.trim()).trim()
-            val rateLimited = err.contains("403") ||
-                err.contains("rate limit", ignoreCase = true)
+            val rateLimited = rateLimitAware &&
+                (err.contains("403") || err.contains("rate limit", ignoreCase = true))
             throw LuaboxCliException(
                 "luabox ${args.firstOrNull().orEmpty()} failed (exit ${output.exitCode}):\n" +
                     err.take(500),
@@ -210,10 +245,4 @@ object LuaboxCli {
 
     private fun JsonObject.bool(key: String): Boolean =
         get(key)?.takeIf { !it.isJsonNull }?.runCatching { asBoolean }?.getOrNull() ?: false
-
-    private fun JsonObject.strList(key: String): List<String> {
-        val el = get(key) ?: return emptyList()
-        if (!el.isJsonArray) return emptyList()
-        return el.asJsonArray.mapNotNull { it.takeIf { e -> !e.isJsonNull }?.asString }
-    }
 }
